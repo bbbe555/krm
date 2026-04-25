@@ -20,8 +20,6 @@ app.add_middleware(
 
 DB_PATH = os.environ.get("KRM_DB_PATH", "/data/krm.db")
 
-# ── Database ──────────────────────────────────────────────────────────────────
-
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -38,7 +36,6 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         );
-
         CREATE TABLE IF NOT EXISTS cells (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -48,7 +45,6 @@ def init_db():
             scope_gate TEXT,
             updated_at TEXT DEFAULT (datetime('now'))
         );
-
         CREATE TABLE IF NOT EXISTS queue_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             cell_id INTEGER NOT NULL REFERENCES cells(id) ON DELETE CASCADE,
@@ -63,8 +59,6 @@ def init_db():
     conn.close()
 
 init_db()
-
-# ── Models ────────────────────────────────────────────────────────────────────
 
 class ProjectIn(BaseModel):
     name: str
@@ -84,8 +78,6 @@ class ProjectImport(BaseModel):
     name: str
     description: Optional[str] = None
     cells: dict
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 STATES = ["current", "kinetic", "desired"]
 ROLES  = ["stakeholder", "user", "engineer"]
@@ -127,8 +119,6 @@ def project_to_dict(conn, project_id):
     return {"id": p["id"], "name": p["name"], "description": p["description"],
             "created_at": p["created_at"], "updated_at": p["updated_at"], "cells": cells}
 
-# ── Projects ──────────────────────────────────────────────────────────────────
-
 @app.get("/api/projects")
 def list_projects():
     conn = get_db()
@@ -152,7 +142,6 @@ def create_project(body: ProjectIn):
 
 @app.post("/api/projects/import", status_code=201)
 def import_project(body: ProjectImport):
-    """Import a project from a JSON snapshot (as produced by /export/json)."""
     conn = get_db()
     cur = conn.execute(
         "INSERT INTO projects (name, description) VALUES (?,?)",
@@ -161,20 +150,13 @@ def import_project(body: ProjectImport):
     conn.commit()
     pid = cur.lastrowid
     ensure_cells(conn, pid)
-
-    # Build a map of new cell ids keyed by state.role
     cells_raw = conn.execute("SELECT * FROM cells WHERE project_id=?", (pid,)).fetchall()
     cell_map = {f"{c['state']}.{c['role']}": c['id'] for c in cells_raw}
-
-    # old queue item id -> new queue item id (needed to remap notes references)
     id_remap = {}
-
     for key, cell_data in body.cells.items():
         cell_id = cell_map.get(key)
         if not cell_id:
             continue
-
-        # Update story / scope_gate
         story = cell_data.get("story")
         scope_gate = cell_data.get("scope_gate")
         if story or scope_gate:
@@ -182,8 +164,6 @@ def import_project(body: ProjectImport):
                 "UPDATE cells SET story=?, scope_gate=? WHERE id=?",
                 (story, scope_gate, cell_id)
             )
-
-        # Insert queue items preserving order_num
         for item in cell_data.get("queue", []):
             cur2 = conn.execute(
                 "INSERT INTO queue_items (cell_id, order_num, description, status, notes) VALUES (?,?,?,?,?)",
@@ -191,14 +171,10 @@ def import_project(body: ProjectImport):
             )
             conn.commit()
             id_remap[item["id"]] = cur2.lastrowid
-
-    # Remap all old IDs in notes fields to new IDs
-    # Affected tags: upstream_for:<id>, declared:<ids>, covers:<ids>, split_from:<id>
     all_items = conn.execute(
         "SELECT qi.id, qi.notes FROM queue_items qi "
         "JOIN cells c ON qi.cell_id = c.id WHERE c.project_id=?", (pid,)
     ).fetchall()
-
     for item in all_items:
         notes = item["notes"]
         if not notes:
@@ -206,32 +182,22 @@ def import_project(body: ProjectImport):
         new_notes = remap_notes_ids(notes, id_remap)
         if new_notes != notes:
             conn.execute("UPDATE queue_items SET notes=? WHERE id=?", (new_notes, item["id"]))
-
     conn.commit()
     result = project_to_dict(conn, pid)
     conn.close()
     return result
 
 def remap_notes_ids(notes: str, id_remap: dict) -> str:
-    """Replace old queue item IDs in notes field tags with new IDs."""
     import re
-
     def remap_id(old_id_str):
         old_id = int(old_id_str)
         return str(id_remap.get(old_id, old_id))
-
     def remap_id_list(old_ids_str):
         return ",".join(remap_id(i) for i in old_ids_str.split(",") if i.strip())
-
-    # upstream_for:<single_id>
     notes = re.sub(r'upstream_for:(\d+)', lambda m: f'upstream_for:{remap_id(m.group(1))}', notes)
-    # split_from:<single_id>
     notes = re.sub(r'split_from:(\d+)', lambda m: f'split_from:{remap_id(m.group(1))}', notes)
-    # declared:<id_list>
     notes = re.sub(r'declared:([\d,]+)', lambda m: f'declared:{remap_id_list(m.group(1))}', notes)
-    # covers:<id_list>
     notes = re.sub(r'covers:([\d,]+)', lambda m: f'covers:{remap_id_list(m.group(1))}', notes)
-
     return notes
 
 @app.get("/api/projects/{pid}")
@@ -250,8 +216,6 @@ def delete_project(pid: int):
     conn.commit()
     conn.close()
 
-# ── Cells ─────────────────────────────────────────────────────────────────────
-
 @app.patch("/api/projects/{pid}/cells/{state}/{role}")
 def update_cell(pid: int, state: str, role: str, body: CellIn):
     conn = get_db()
@@ -269,8 +233,6 @@ def update_cell(pid: int, state: str, role: str, body: CellIn):
     conn.commit()
     conn.close()
     return {"ok": True}
-
-# ── Queue Items ───────────────────────────────────────────────────────────────
 
 @app.post("/api/projects/{pid}/cells/{state}/{role}/queue", status_code=201)
 def add_queue_item(pid: int, state: str, role: str, body: QueueItemIn):
@@ -321,8 +283,6 @@ def delete_queue_item(item_id: int):
     conn.commit()
     conn.close()
 
-# ── Export ────────────────────────────────────────────────────────────────────
-
 @app.get("/api/projects/{pid}/export/json")
 def export_json(pid: int):
     conn = get_db()
@@ -339,14 +299,11 @@ def export_markdown(pid: int):
     conn.close()
     if not data:
         raise HTTPException(404)
-
-    lines = [f"# KRM — {data['name']}", ""]
+    lines = [f"# KRM \u2014 {data['name']}", ""]
     if data.get("description"):
         lines += [data["description"], ""]
-
     STATE_LABELS = {"current": "Current", "kinetic": "Kinetic", "desired": "Desired"}
     ROLE_LABELS  = {"stakeholder": "Owner / Stakeholder", "user": "User", "engineer": "Engineer"}
-
     for state in STATES:
         lines += [f"## {STATE_LABELS[state]} State", ""]
         for role in ROLES:
@@ -370,10 +327,7 @@ def export_markdown(pid: int):
                 lines.append("")
             else:
                 lines += ["**Yield Queue:** _Empty._", ""]
-
     return "\n".join(lines)
-
-# ── Static frontend ───────────────────────────────────────────────────────────
 
 FRONTEND_DIR = "/app/frontend"
 if os.path.exists(FRONTEND_DIR):
