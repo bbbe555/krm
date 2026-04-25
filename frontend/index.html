@@ -602,6 +602,8 @@
       <div class="sidebar-header">
         <span class="sidebar-title">Projects</span>
         <button class="btn-ghost btn-sm" onclick="openNewProject()">+ New</button>
+        <button class="btn-ghost btn-sm" onclick="document.getElementById('import-file-input').click()">↑ Import</button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importJSON(this)">
       </div>
       <div id="project-list"></div>
     </div>
@@ -613,6 +615,7 @@
         <h2>No project selected</h2>
         <p>Create a new project to begin working through the Kinetic Requirements Model procedure.</p>
         <button class="btn-primary" onclick="openNewProject()">Create project</button>
+        <button class="btn-ghost" onclick="document.getElementById('import-file-input').click()">Import JSON</button>
       </div>
       <div id="view-project" class="hidden"></div>
     </div>
@@ -620,10 +623,6 @@
 
   <!-- Export bar -->
   <div class="export-bar" id="export-bar" style="display:none">
-    <span class="export-label" style="margin-right:4px">Import:</span>
-    <button class="btn-ghost btn-sm" onclick="document.getElementById('import-file-input').click()">JSON</button>
-    <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importJSON(this)">
-    <span style="width:1px;background:var(--border);height:16px;margin:0 8px"></span>
     <span class="export-label">Export:</span>
     <button class="btn-ghost btn-sm" onclick="exportJSON()">JSON</button>
     <button class="btn-ghost btn-sm" onclick="exportMarkdown()">Markdown</button>
@@ -639,7 +638,7 @@
 </div>
 
 <script>
-const VERSION = '5.8';
+const VERSION = '5.9';
 const API = '';
 let state = { projects: [], current: null, step: 0, tab: null };
 let depFocus = null; // { type: 'eng'|'cond', id: Number }
@@ -3099,38 +3098,6 @@ async function deleteProject() {
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────
-
-async function importJSON(input) {
-  const file = input.files[0];
-  if (!file) return;
-  input.value = ''; // reset so same file can be re-imported
-  let data;
-  try {
-    data = JSON.parse(await file.text());
-  } catch(e) {
-    alert('Invalid JSON file.');
-    return;
-  }
-  if (!data.name || !data.cells) {
-    alert('This does not look like a KRM export file.');
-    return;
-  }
-  try {
-    const project = await api('POST', '/api/projects/import', {
-      name: data.name,
-      description: data.description || null,
-      cells: data.cells
-    });
-    state.projects = await api('GET', '/api/projects');
-    state.current = project;
-    state.step = 0;
-    state.tab = null;
-    renderSidebar();
-    renderProject();
-  } catch(e) {
-    alert('Import failed: ' + e.message);
-  }
-}
 
 async function exportJSON() {
   if (!state.current) return;
