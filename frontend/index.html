@@ -1,0 +1,3148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KRM — Kinetic Requirements Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0f1117;
+    --surface:   #181c27;
+    --surface2:  #1f2535;
+    --border:    #2a3045;
+    --border2:   #3a4460;
+    --text:      #e2e8f0;
+    --muted:     #7a8499;
+    --accent:    #5b8dee;
+    --accent2:   #3d6fd4;
+    --stake:     #3b6fa0;
+    --user:      #2d7a5a;
+    --eng:       #7a3d8a;
+    --current:   #1a2d4a;
+    --kinetic:   #2d2010;
+    --desired:   #0d2d1a;
+    --active:    #7a6200;
+    --closed:    #1a5c2a;
+    --deferred:  #1e2535;
+    --blocked:   #5c1a1a;
+    --warn:      #c87941;
+    --mono:      'DM Mono', monospace;
+    --sans:      'DM Sans', sans-serif;
+    --r:         6px;
+    --r2:        10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: .12em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .logo span { color: var(--muted); }
+
+  .header-actions { display: flex; gap: 8px; }
+
+  main { flex: 1; display: flex; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 260px; min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .sidebar-title {
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: .1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  #project-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+  .project-item {
+    padding: 10px 12px;
+    border-radius: var(--r);
+    cursor: pointer;
+    border: 1px solid transparent;
+    margin-bottom: 4px;
+    transition: all .15s;
+  }
+
+  .project-item:hover { background: var(--surface2); border-color: var(--border); }
+  .project-item.active { background: var(--surface2); border-color: var(--accent); }
+
+  .project-item-name {
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .project-item-meta {
+    font-size: 11px; color: var(--muted); margin-top: 2px;
+    font-family: var(--mono);
+  }
+
+  /* ── Content area ── */
+  #content { flex: 1; overflow-y: auto; padding: 32px; }
+
+  /* ── Empty states ── */
+  .empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 400px; gap: 16px;
+    color: var(--muted); text-align: center;
+  }
+
+  .empty-icon { font-size: 48px; opacity: .4; }
+  .empty h2 { font-size: 18px; color: var(--text); font-weight: 500; }
+  .empty p { max-width: 340px; line-height: 1.7; }
+
+  /* ── Step navigator ── */
+  #step-nav {
+    display: flex; gap: 4px; margin-bottom: 28px;
+    overflow-x: auto; padding-bottom: 4px;
+  }
+
+  .step-btn {
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-family: var(--mono);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+  }
+
+  .step-btn:hover { border-color: var(--border2); color: var(--text); }
+  .step-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .step-btn.done { border-color: var(--closed); color: #4ade80; }
+
+  /* ── Step panel ── */
+  .step-panel { width: 100%; }
+
+  .step-header {
+    display: flex; align-items: flex-start; gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .1em;
+    color: var(--accent);
+    background: rgba(91,141,238,.12);
+    border: 1px solid rgba(91,141,238,.25);
+    padding: 4px 10px;
+    border-radius: 100px;
+    white-space: nowrap;
+    margin-top: 3px;
+  }
+
+  .step-title { font-size: 20px; font-weight: 600; line-height: 1.3; }
+  .step-guide {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--r);
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.75;
+  }
+
+  .step-guide strong { color: var(--text); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r2);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+
+  .card-body { padding: 16px; }
+
+  /* ── Role badges ── */
+  .badge-stakeholder { color: #7bb3e0; }
+  .badge-user        { color: #6ecfa0; }
+  .badge-engineer    { color: #c48ce0; }
+
+  .state-tag {
+    font-size: 10px; font-family: var(--mono);
+    padding: 2px 8px; border-radius: 100px;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+
+  .tag-current  { background: rgba(59,111,160,.2);  color: #7bb3e0; border: 1px solid rgba(59,111,160,.4); }
+  .tag-kinetic  { background: rgba(160,110,40,.2);  color: #e0b96e; border: 1px solid rgba(160,110,40,.4); }
+  .tag-desired  { background: rgba(45,122,90,.2);   color: #6ecfa0; border: 1px solid rgba(45,122,90,.4); }
+
+  /* ── Inputs ── */
+  textarea, input[type=text] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    padding: 10px 12px;
+    outline: none;
+    resize: vertical;
+    transition: border-color .15s;
+  }
+
+  textarea:focus, input[type=text]:focus {
+    border-color: var(--accent);
+  }
+
+  textarea { min-height: 80px; }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: .08em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .field { margin-bottom: 16px; }
+
+  .resolution-hint {
+    font-size: 11px; color: var(--muted);
+    margin-top: 6px; line-height: 1.6;
+  }
+
+  .resolution-hint .good { color: #4ade80; }
+  .resolution-hint .bad  { color: #f87171; }
+
+  /* ── Buttons ── */
+  button {
+    font-family: var(--sans);
+    cursor: pointer;
+    border: none;
+    border-radius: var(--r);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 16px;
+    transition: all .15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent2); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+
+  .btn-danger {
+    background: transparent;
+    color: #f87171;
+    border: 1px solid rgba(248,113,113,.3);
+  }
+  .btn-danger:hover { background: rgba(248,113,113,.1); }
+
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-icon { padding: 6px 8px; font-size: 14px; }
+
+  .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* ── Queue items ── */
+  .queue-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .queue-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 10px 12px;
+  }
+
+  .queue-item.status-active   { border-left: 3px solid #fbbf24; }
+  .queue-item.status-closed   { border-left: 3px solid #4ade80; opacity: .7; }
+  .queue-item.status-deferred { border-left: 3px solid var(--muted); opacity: .6; }
+  .queue-item.status-blocked  { border-left: 3px solid #f87171; }
+
+  .queue-num {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted); min-width: 20px; padding-top: 2px;
+  }
+
+  .queue-content { flex: 1; }
+
+  .queue-desc {
+    font-size: 13px; margin-bottom: 4px;
+  }
+
+  .queue-notes {
+    font-size: 11px; color: var(--muted);
+    font-style: italic;
+  }
+
+  .queue-controls {
+    display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+  }
+
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 4px 8px;
+    outline: none;
+  }
+
+  .status-pill {
+    font-size: 10px; font-family: var(--mono);
+    padding: 2px 8px; border-radius: 100px;
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+
+  .pill-pending  { background: rgba(122,130,153,.15); color: var(--muted); }
+  .pill-active   { background: rgba(251,191,36,.15);  color: #fbbf24; }
+  .pill-closed   { background: rgba(74,222,128,.15);  color: #4ade80; }
+  .pill-deferred { background: rgba(122,130,153,.15); color: var(--muted); }
+  .pill-blocked  { background: rgba(248,113,113,.15); color: #f87171; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 24px;
+  }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--r2);
+    width: 100%; max-width: 480px;
+    padding: 24px;
+  }
+
+  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+
+  /* ── Export bar ── */
+  .export-bar {
+    display: flex; gap: 8px; align-items: center;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .export-label {
+    font-size: 11px; font-family: var(--mono);
+    color: var(--muted); margin-right: 4px;
+  }
+
+  /* ── Scope gate summary ── */
+  .gate-summary {
+    background: rgba(255,200,50,.05);
+    border: 1px solid rgba(255,200,50,.15);
+    border-radius: var(--r);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #e0c96e;
+    margin-bottom: 16px;
+  }
+
+  .gate-summary strong { color: #fbbf24; }
+
+  /* ── Progress bar ── */
+  .progress-row {
+    display: flex; gap: 4px; margin-bottom: 28px;
+  }
+
+  .progress-seg {
+    height: 3px; flex: 1; border-radius: 2px;
+    background: var(--border);
+    transition: background .3s;
+  }
+
+  .progress-seg.done { background: var(--accent); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── Project tabs ── */
+  .project-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 28px;
+    padding: 4px 4px 0 4px;
+    background: var(--surface2);
+    border-radius: var(--r2) var(--r2) 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+  }
+
+  .project-tab {
+    flex: 1;
+    padding: 14px 24px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--sans);
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    color: var(--muted);
+    border-radius: var(--r) var(--r) 0 0;
+    margin-bottom: -1px;
+    transition: all .15s;
+    letter-spacing: .01em;
+  }
+
+  .project-tab:hover {
+    color: var(--text);
+    background: rgba(255,255,255,.04);
+  }
+
+  .project-tab.active {
+    color: #ffffff;
+    background: var(--surface);
+    border-color: var(--border);
+    border-bottom: 1px solid var(--surface);
+    font-weight: 700;
+  }
+
+  .project-tab .tab-icon {
+    display: block;
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 3px;
+    font-weight: 400;
+  }
+
+  .project-tab.active .tab-icon { color: var(--accent); }  /* ── Matrix view ── */
+  .matrix-grid {
+    display: grid;
+    grid-template-columns: 120px 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--r2);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+
+  .matrix-cell {
+    background: var(--surface);
+    padding: 12px 14px;
+    min-height: 80px;
+  }
+
+  .matrix-header {
+    background: var(--surface2);
+    padding: 10px 14px;
+    font-size: 10px;
+    font-family: var(--mono);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .matrix-role {
+    background: var(--surface2);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .matrix-cell-content {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  .matrix-cell-empty {
+    font-size: 11px;
+    color: var(--border2);
+    font-style: italic;
+  }
+
+  .matrix-cell-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .matrix-cell-item {
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.5;
+    padding: 3px 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    border-left: 2px solid var(--border2);
+  }
+
+  .matrix-cell:hover .cell-edit-hint { opacity: 1 !important; }
+
+  /* ── Dependency highlighting ── */
+  .dep-item {
+    transition: box-shadow .15s, opacity .15s, border-color .15s;
+  }
+  .dep-item.dep-highlight {
+    box-shadow: 0 0 0 2px var(--accent);
+    border-color: var(--accent) !important;
+    opacity: 1 !important;
+  }
+  .dep-item.dep-dim {
+    opacity: .3;
+  }
+  .dep-declared {
+    display: inline-block;
+    font-size: 10px;
+    font-family: var(--mono);
+    background: rgba(91,141,238,.15);
+    color: var(--accent);
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-top: 3px;
+  }
+  .matrix-cell-item.has-ac { border-left-color: #4ade80; }
+  .matrix-cell-item.no-ac  { border-left-color: var(--warn); }
+
+  .hidden { display: none !important; }
+  .mt8 { margin-top: 8px; }
+  .mt16 { margin-top: 16px; }
+  .gap8 { gap: 8px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">KRM <span>/ Kinetic Requirements Model</span></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em">v<span id="ver"></span></div>
+    <div class="header-actions" id="header-actions"></div>
+  </header>
+
+  <main>
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Projects</span>
+        <button class="btn-ghost btn-sm" onclick="openNewProject()">+ New</button>
+      </div>
+      <div id="project-list"></div>
+    </div>
+
+    <!-- Content -->
+    <div id="content">
+      <div id="view-empty" class="empty">
+        <div class="empty-icon">⬡</div>
+        <h2>No project selected</h2>
+        <p>Create a new project to begin working through the Kinetic Requirements Model procedure.</p>
+        <button class="btn-primary" onclick="openNewProject()">Create project</button>
+      </div>
+      <div id="view-project" class="hidden"></div>
+    </div>
+  </main>
+
+  <!-- Export bar -->
+  <div class="export-bar" id="export-bar" style="display:none">
+    <span class="export-label">Export:</span>
+    <button class="btn-ghost btn-sm" onclick="exportJSON()">JSON</button>
+    <button class="btn-ghost btn-sm" onclick="exportMarkdown()">Markdown</button>
+    <div style="flex:1"></div>
+    <button class="btn-danger btn-sm" onclick="deleteProject()">Delete project</button>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div id="modal" class="modal-overlay hidden">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<script>
+const VERSION = '5.8';
+const API = '';
+let state = { projects: [], current: null, step: 0, tab: null };
+let depFocus = null; // { type: 'eng'|'cond', id: Number }
+
+const STEPS = [
+  { id: 0, label: 'Anchor States', title: 'Anchor States',
+    stepNum: 'Step 1',
+    guide: 'Establish the stakeholder\'s fixed points — where things are now, where they need to be, and the transition between them. These three sentences frame the entire engagement. Everything else is derived from them.',
+    action: 'multi', role: 'stakeholder', field: 'stakeholder-states',
+    hint: null },
+  { id: 1, label: 'User States', title: 'User States',
+    stepNum: 'Step 2',
+    guide: 'Capture the user perspective across all three states. Add entries to any column as they surface — you do not need to work left to right.',
+    action: 'multi', role: 'user', field: 'user-states',
+    hint: null },
+  { id: 2, label: 'Engineered States', title: 'Engineered States',
+    stepNum: 'Step 3',
+    guide: 'This surface holds two things that must stay distinct:\n\n<strong>States</strong> (left) — conditions of the world, true or false. "User account is provisioned in EXO." You can point at the world and ask if it\'s true.\n\n<strong>Work Items</strong> (right) — the ordered sequence of states that must become true to achieve the engineered states. Also states, not work. Work is what happens outside this tool in response to a condition not yet being true.\n\nWhen a condition closes, mark which engineered states it satisfies.',
+    action: 'multi', role: 'engineer', field: 'engineered-combined',
+    hint: null },
+  { id: 3, label: 'Kinetic', title: 'Kinetic View',
+    stepNum: 'Step 4',
+    guide: 'Derived execution order based on prerequisite relationships. Contradictions and gaps are surfaced automatically. State completion tracks progress toward each engineered state.',
+    action: 'kinetic', role: 'engineer', field: 'kinetic-analysis',
+    hint: null },
+];
+
+// ── API ────────────────────────────────────────────────────────────────────
+
+async function api(method, path, body) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  if (!r.ok) throw new Error(await r.text());
+  if (r.status === 204) return null;
+  return r.json();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+async function init() {
+  state.projects = await api('GET', '/api/projects');
+  renderSidebar();
+  if (state.projects.length) loadProject(state.projects[0].id);
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+
+function renderSidebar() {
+  const el = document.getElementById('project-list');
+  if (!state.projects.length) {
+    el.innerHTML = `<div style="padding:16px;color:var(--muted);font-size:12px;text-align:center">No projects yet</div>`;
+    return;
+  }
+  el.innerHTML = state.projects.map(p => `
+    <div class="project-item ${state.current?.id === p.id ? 'active' : ''}"
+         onclick="loadProject(${p.id})">
+      <div class="project-item-name">${esc(p.name)}</div>
+      <div class="project-item-meta">${p.updated_at?.slice(0,10) || ''}</div>
+    </div>
+  `).join('');
+}
+
+// ── Load project ───────────────────────────────────────────────────────────
+
+async function loadProject(id) {
+  state.current = await api('GET', `/api/projects/${id}`);
+  state.step = 0;
+  state.tab = null;
+  renderSidebar();
+  renderProject();
+}
+
+function renderProject() {
+  const p = state.current;
+  document.getElementById('view-empty').classList.add('hidden');
+  const view = document.getElementById('view-project');
+  view.classList.remove('hidden');
+  document.getElementById('export-bar').style.display = 'flex';
+
+  // Default tab to null (show tab chooser) on first load, preserve on subsequent
+  if (!state.tab) state.tab = null;
+
+  const tabsHtml = `
+    <div style="margin-bottom:4px;font-size:18px;font-weight:600">${esc(p.name)}</div>
+    ${p.description ? `<div style="color:var(--muted);font-size:13px;margin-bottom:16px">${esc(p.description)}</div>` : ''}
+    <div class="project-tabs">
+      <button class="project-tab ${state.tab === 'view' ? 'active' : ''}" onclick="setTab('view')">
+        View
+        <span class="tab-icon">top-down</span>
+      </button>
+      <button class="project-tab ${state.tab === 'refine' ? 'active' : ''}" onclick="setTab('refine')">
+        Refine
+        <span class="tab-icon">step-by-step</span>
+      </button>
+    </div>
+    <div id="tab-content"></div>
+  `;
+
+  view.innerHTML = tabsHtml;
+  renderTab();
+}
+
+function setTab(tab) {
+  state.tab = tab;
+  // Update tab button styles directly without full re-render
+  document.querySelectorAll('.project-tab').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const idx = tab === 'view' ? 0 : 1;
+  document.querySelectorAll('.project-tab')[idx]?.classList.add('active');
+  renderTab();
+}
+
+function renderTab() {
+  const el = document.getElementById('tab-content');
+  if (!el) return;
+
+  if (!state.tab) {
+    el.innerHTML = '';
+    return;
+  }
+
+  if (state.tab === 'view') {
+    el.innerHTML = renderMatrixView(state.current);
+  } else {
+    // Step nav
+    const navHtml = STEPS.map((s,i) => `
+      <button class="step-btn ${i === state.step ? 'active' : ''}"
+              onclick="goStep(${i})">${s.label}</button>
+    `).join('');
+    const progHtml = STEPS.map((_,i) =>
+      `<div class="progress-seg ${i <= state.step ? 'done' : ''}"></div>`
+    ).join('');
+    el.innerHTML = `
+      <div class="progress-row">${progHtml}</div>
+      <div id="step-nav">${navHtml}</div>
+      <div id="step-content" style="padding-bottom:16px"></div>
+      <div id="step-nav-buttons" style="
+        border-top:1px solid var(--border);
+        padding:12px 0;
+        display:flex;gap:8px;align-items:center;
+        background:var(--bg);
+      "></div>
+    `;
+    renderStep();
+    renderStepButtons();
+  }
+}
+
+function matrixCellClick(state, role) {
+  if (state === 'kinetic' && role === 'engineer') {
+    openMatrixQueueEditor();
+  } else if (state === 'desired' && role === 'engineer') {
+    openMatrixListEditor('desired', 'engineer', 'Engineer Desired States',
+      'What must be technically true for user stories to be possible. One end state per entry.',
+      'badge-engineer');
+  } else if (state === 'desired' && role === 'user') {
+    openMatrixListEditor('desired', 'user', 'User Desired States',
+      'What users need to be true. One story per entry. One state change, one sentence, evaluable without engineering knowledge.',
+      'badge-user');
+  } else if (state === 'current' && role === 'user') {
+    openMatrixListEditor('current', 'user', 'User Current States',
+      'What is true for users right now. One entry per story, mirroring the desired state with the current platform.',
+      'badge-user');
+  } else if (state === 'current' && role === 'engineer') {
+    openMatrixListEditor('current', 'engineer', 'Engineer Current States',
+      'What is technically true right now. One entry per relevant condition.',
+      'badge-engineer');
+  } else if (state === 'kinetic' && role === 'user') {
+    openMatrixListEditor('kinetic', 'user', 'User Kinetic States',
+      'What transition conditions are visible to the user. One entry per observable change.',
+      'badge-user');
+  } else if (state === 'kinetic' && role === 'stakeholder') {
+    openMatrixStoryEditor(state, role);
+  } else {
+    // Stakeholder cells — single sentence
+    openMatrixStoryEditor(state, role);
+  }
+}
+
+function openMatrixStoryEditor(st, role) {
+  const p = state.current;
+  const cell = p.cells[`${st}.${role}`] || {};
+  const val = cell.story || '';
+  const ROLE_LABELS = { stakeholder:'Owner / Stakeholder', user:'User', engineer:'Engineer' };
+  const STATE_LABELS = { current:'Current', kinetic:'Kinetic', desired:'Desired' };
+
+  openModal(`
+    <h3>${ROLE_LABELS[role]} — ${STATE_LABELS[st]}</h3>
+    <div class="field">
+      <label>Story</label>
+      <textarea id="matrix-story-input" rows="4"
+        placeholder="One sentence. One state change.">${esc(val)}</textarea>
+    </div>
+    <div class="btn-row mt16">
+      <button class="btn-primary" onclick="saveMatrixStory('${st}','${role}')">Save</button>
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('matrix-story-input')?.focus(), 50);
+}
+
+async function saveMatrixStory(st, role) {
+  const val = document.getElementById('matrix-story-input')?.value?.trim();
+  await api('PATCH', `/api/projects/${state.current.id}/cells/${st}/${role}`, { story: val });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  closeModal();
+  renderTab();
+}
+
+function openMatrixListEditor(st, role, title, guide, badgeClass) {
+  const p = state.current;
+  const items = p.cells[`${st}.${role}`]?.queue || [];
+
+  const listHtml = items.length
+    ? items.map((item, idx) => `
+        <div class="queue-item" style="border-left:3px solid var(--${role === 'user' ? 'user' : 'eng'})">
+          <div class="queue-num">${idx+1}</div>
+          <div class="queue-content"><div class="queue-desc">${esc(item.description||'')}</div></div>
+          <div class="queue-controls">
+            <button class="btn-danger btn-icon btn-sm" onclick="deleteMatrixListItem(${item.id},'${st}','${role}','${title}','${guide}','${badgeClass}')">✕</button>
+          </div>
+        </div>`).join('')
+    : '<div style="color:var(--muted);font-size:12px;margin-bottom:8px">No entries yet.</div>';
+
+  openModal(`
+    <h3 class="${badgeClass}">${title}</h3>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.7">${guide}</div>
+    <div id="matrix-list-items" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">${listHtml}</div>
+    <div class="field">
+      <label>Add entry</label>
+      <input type="text" id="matrix-list-input"
+        placeholder="One sentence, one state change..."
+        onkeydown="if(event.key==='Enter'){event.preventDefault();addMatrixListItem('${st}','${role}','${title}','${guide}','${badgeClass}');}">
+    </div>
+    <div class="btn-row mt16">
+      <button class="btn-primary btn-sm" onclick="addMatrixListItem('${st}','${role}','${title}','${guide}','${badgeClass}')">Add</button>
+      <button class="btn-ghost" onclick="closeModal();renderTab();">Done</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('matrix-list-input')?.focus(), 50);
+}
+
+async function addMatrixListItem(st, role, title, guide, badgeClass) {
+  const desc = document.getElementById('matrix-list-input')?.value?.trim();
+  if (!desc) return;
+  await api('POST', `/api/projects/${state.current.id}/cells/${st}/${role}/queue`, {
+    description: desc, status: 'pending'
+  });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  openMatrixListEditor(st, role, title, guide, badgeClass);
+  setTimeout(() => document.getElementById('matrix-list-input')?.focus(), 50);
+}
+
+async function deleteMatrixListItem(id, st, role, title, guide, badgeClass) {
+  await api('DELETE', `/api/queue/${id}`);
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  openMatrixListEditor(st, role, title, guide, badgeClass);
+}
+
+function openMatrixQueueEditor() {
+  // Switch to Refine tab at Step 5 (yield queue)
+  state.tab = 'refine';
+  state.step = STEPS.findIndex(s => s.field === 'queue');
+  renderProject();
+  closeModal();
+}
+
+function renderMatrixView(p) {
+  const STATES = ['current','kinetic','desired'];
+  const ROLES  = ['stakeholder','user','engineer'];
+  const STATE_LABELS = { current:'Current', kinetic:'Kinetic', desired:'Desired' };
+  const ROLE_LABELS  = { stakeholder:'Owner / Stakeholder', user:'User', engineer:'Engineer' };
+  const ROLE_COLORS  = { stakeholder:'var(--stake)', user:'var(--user)', engineer:'var(--eng)' };
+
+  // Check for blocked items — upward propagation flags
+  const blockedItems = (p.cells['kinetic.engineer']?.queue || []).filter(i => i.status === 'blocked');
+  const hasBlockers = blockedItems.length > 0;
+
+  // Header row
+  let html = '';
+
+  if (hasBlockers) {
+    html += `<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#f87171;display:flex;gap:10px;align-items:center">
+      <span>⚠</span>
+      <span><strong>${blockedItems.length} blocked item${blockedItems.length>1?'s':''} in yield queue</strong> — review may affect upstream stories and goals.</span>
+      <button class="btn-ghost btn-sm" style="border-color:rgba(248,113,113,.3);color:#f87171;margin-left:auto" onclick="state.tab='refine';state.step=STEPS.findIndex(s=>s.field==='queue');renderProject()">View queue →</button>
+    </div>`;
+  }
+
+  html += '<div class="matrix-grid">';
+  html += '<div class="matrix-header"></div>';
+  STATES.forEach(s => {
+    html += `<div class="matrix-header">${STATE_LABELS[s]}</div>`;
+  });
+
+  ROLES.forEach(role => {
+    html += `<div class="matrix-role">
+      <span style="font-size:11px;font-weight:600;color:${ROLE_COLORS[role]};font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg)">${ROLE_LABELS[role]}</span>
+    </div>`;
+
+    STATES.forEach(st => {
+      const cell = p.cells[`${st}.${role}`] || {};
+      const isEmpty = cellIsEmpty(p, st, role);
+      const isQueueCell = st === 'kinetic' && role === 'engineer';
+
+      html += `<div class="matrix-cell" style="cursor:pointer;position:relative"
+        onclick="matrixCellClick('${st}','${role}')"
+        onmouseenter="this.style.background='var(--surface2)'"
+        onmouseleave="this.style.background='var(--surface)'">`;
+
+      // Edit hint
+      html += `<div style="position:absolute;top:6px;right:6px;font-size:9px;font-family:var(--mono);color:var(--border2);letter-spacing:.06em;text-transform:uppercase;opacity:0" class="cell-edit-hint">edit</div>`;
+
+      if (isQueueCell) {
+        const queue = p.cells['kinetic.engineer']?.queue || [];
+        const blocked = queue.filter(i => i.status === 'blocked').length;
+        if (queue.length) {
+          const closed = queue.filter(i => i.status === 'closed').length;
+          html += `<div class="matrix-cell-list">`;
+          if (blocked) html += `<div style="font-size:10px;color:#f87171;margin-bottom:4px">⚠ ${blocked} blocked</div>`;
+          html += `<div style="font-size:10px;font-family:var(--mono);color:var(--muted);margin-bottom:4px">${closed}/${queue.length} closed</div>`;
+          queue.slice(0,4).forEach(item => {
+            const hasAC = (item.notes||'').match(/ac:/);
+            const statusColor = {pending:'var(--border2)',active:'#fbbf24',closed:'#4ade80',deferred:'var(--muted)',blocked:'#f87171'}[item.status]||'var(--border2)';
+            html += `<div class="matrix-cell-item ${hasAC?'has-ac':'no-ac'}" style="border-left-color:${statusColor}">${esc((item.description||'').slice(0,55))}${(item.description||'').length>55?'…':''}</div>`;
+          });
+          if (queue.length > 4) html += `<div style="font-size:10px;color:var(--muted);padding:2px 6px">+${queue.length-4} more — click to open</div>`;
+          html += `</div>`;
+        } else {
+          html += `<span class="matrix-cell-empty">click to add</span>`;
+        }
+      } else if (
+        (st === 'desired' && (role === 'engineer' || role === 'user')) ||
+        (st === 'current' && (role === 'engineer' || role === 'user')) ||
+        (st === 'kinetic' && role === 'user')
+      ) {
+        const qkey = `${st}.${role}`;
+        const items = p.cells[qkey]?.queue || [];
+        if (items.length) {
+          html += `<div class="matrix-cell-list">`;
+          items.forEach(item => {
+            html += `<div class="matrix-cell-item">${esc((item.description||'').slice(0,55))}${(item.description||'').length>55?'…':''}</div>`;
+          });
+          html += `</div>`;
+        } else {
+          html += `<span class="matrix-cell-empty">click to add</span>`;
+        }
+      } else {
+        const story = cell.story;
+        html += story
+          ? `<div class="matrix-cell-content">${esc(story)}</div>`
+          : `<span class="matrix-cell-empty">click to add</span>`;
+      }
+
+      html += `</div>`;
+    });
+  });
+
+  html += '</div>';
+
+  // Progress bar
+  const queue = p.cells['kinetic.engineer']?.queue || [];
+  if (queue.length) {
+    const closed = queue.filter(i => i.status === 'closed').length;
+    const pct = Math.round((closed / queue.length) * 100);
+    html += `
+      <div style="margin-top:8px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:6px">
+          <span>Yield queue progress</span>
+          <span>${closed} / ${queue.length} closed (${pct}%)</span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:3px;transition:width .3s"></div>
+        </div>
+      </div>`;
+  }
+
+  return html;
+}
+
+function cellIsEmpty(p, st, role) {
+  const cell = p.cells[`${st}.${role}`] || {};
+  const isListCell = (
+    (st === 'desired' && (role === 'user' || role === 'engineer')) ||
+    (st === 'current' && (role === 'user' || role === 'engineer')) ||
+    (st === 'kinetic' && role === 'user') ||
+    (st === 'kinetic' && role === 'engineer')
+  );
+  if (isListCell) return !(p.cells[`${st}.${role}`]?.queue?.length);
+  return !cell.story;
+}
+
+// ── Step rendering ─────────────────────────────────────────────────────────
+
+
+function renderStepButtons() {
+  const el = document.getElementById('step-nav-buttons');
+  if (!el) return;
+  el.innerHTML = `
+    ${state.step > 0 ? `<button class="btn-ghost" onclick="goStep(${state.step-1})">← Back</button>` : ''}
+    ${state.step < STEPS.length-1 ? `<button class="btn-primary" onclick="goStep(${state.step+1})">Next →</button>` : '<span style="color:var(--muted);font-size:13px">Matrix complete — use export to save your work.</span>'}
+  `;
+}
+
+function goStep(i) {
+  state.step = i;
+  state.tab = 'refine';
+  renderProject();
+  setTimeout(renderStepButtons, 0);
+}
+
+function renderStep() {
+  const s = STEPS[state.step];
+  const p = state.current;
+  const el = document.getElementById('step-content');
+
+  let html = `
+    <div class="step-panel">
+      <div class="step-header">
+        <span class="step-num">${s.stepNum || s.label}</span>
+        <div>
+          <div class="step-title">${s.title}</div>
+        </div>
+      </div>
+      <div class="step-guide">${s.guide.replace(/\n/g,'<br>')}</div>
+      ${s.hint ? `<div style="font-size:12px;color:var(--muted);margin-bottom:20px;font-style:italic">${s.hint}</div>` : ''}
+  `;
+
+  if (s.field === 'stakeholder-states') {
+    html += renderStakeholderStates(p);
+  } else if (s.field === 'user-states') {
+    html += renderUserStates(p);
+  } else if (s.action === 'kinetic' && s.role === null) {
+    html += renderKineticStep(p);
+  } else if (s.field === 'queue') {
+    html += renderQueueStep(p, s);
+  } else if (s.field === 'list') {
+    html += renderListStep(p, s);
+  } else if (s.field === 'engineer-desired-list') {
+    html += renderEngineerDesiredList(p, s);
+  } else if (s.field === 'eng-list') {
+    html += renderEngListStep(p, s);
+  } else if (s.field === 'engineered-combined') {
+    html += renderEngineeredCombined(p);
+  } else if (s.field === 'kinetic-analysis') {
+    html += renderKineticAnalysis(p);
+  } else if (s.field === 'test-plan') {
+    html += renderTestPlanStep(p, s);
+  } else {
+    html += renderFieldStep(p, s);
+  }
+
+  html += `
+    </div>
+  `;
+  // Append nav buttons outside the scrolling panel, in a fixed footer
+
+
+  el.innerHTML = html;
+  setTimeout(applyDepHighlight, 0);
+}
+
+function renderFieldStep(p, s) {
+  const key = `${s.action}.${s.role}`;
+  const cell = p.cells[key] || {};
+  const val = cell[s.field] || '';
+  const roleLabel = {stakeholder:'Owner / Stakeholder', user:'User', engineer:'Engineer'}[s.role];
+  const roleClass = `badge-${s.role}`;
+
+  // Show engineer desired states as reference in scope gate step
+  const storyListHtml = (s.action === 'desired' && s.role === 'engineer' && s.field === 'scope_gate') ? (() => {
+    const items = p.cells['desired.engineer']?.queue || [];
+    if (!items.length) return '';
+    return `<div class="gate-summary" style="margin-bottom:16px">
+      <strong>Engineer desired states:</strong><br>
+      ${items.map((st, i) => `<span style="display:block;margin-top:4px">${i+1}. ${esc(st.description||'')}</span>`).join('')}
+    </div>`;
+  })() : '';
+
+  return `${storyListHtml}
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label ${roleClass}">${roleLabel}</span>
+        <span class="state-tag tag-${s.action}">${s.action}</span>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <label>${s.field === 'story' ? 'Story' : 'Scope Gate'}</label>
+          <textarea id="field-input" rows="4" placeholder="${s.field === 'story' ? 'One sentence. One state change.' : 'Load-bearing dependencies only — if absent, does the engineer desired state fail?'}">${esc(val)}</textarea>
+          ${s.field === 'story' ? `
+          <div class="resolution-hint">
+            <span class="good">✓ Correct:</span> One state change · One sentence · Evaluable at this role's level<br>
+            <span class="bad">✗ Too broad:</span> Multiple changes or a category &nbsp;
+            <span class="bad">✗ Too granular:</span> Requires knowledge from another row
+          </div>` : ''}
+        </div>
+        <button class="btn-primary" onclick="saveField('${s.action}','${s.role}','${s.field}')">Save</button>
+        ${val ? `<span style="font-size:11px;color:var(--muted);margin-left:10px">✓ Saved</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+
+function renderListStep(p, s) {
+  const queue = p.cells['desired.user']?.queue || [];
+  const roleLabel = 'User';
+
+  let itemsHtml = '';
+  if (queue.length) {
+    itemsHtml = '<div class="queue-list" style="margin-bottom:16px">' +
+      queue.map((item, idx) => `
+        <div class="queue-item" id="us-${item.id}" style="border-left:3px solid var(--user)">
+          <div class="queue-num">${idx + 1}</div>
+          <div class="queue-content">
+            <div class="queue-desc">${esc(item.description || '')}</div>
+          </div>
+          <div class="queue-controls">
+            <button class="btn-ghost btn-icon btn-sm" onclick="editUserStory(${item.id})" title="Edit">✎</button>
+            <button class="btn-danger btn-icon btn-sm" onclick="deleteUserStory(${item.id})" title="Remove">✕</button>
+          </div>
+        </div>
+      `).join('') +
+    '</div>';
+  } else {
+    itemsHtml = '<div style="color:var(--muted);font-size:13px;margin-bottom:16px">No stories yet — add your first one below.</div>';
+  }
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label badge-user">${roleLabel} — Desired Stories</span>
+        <span class="state-tag tag-desired">desired</span>
+      </div>
+      <div class="card-body">
+        ${itemsHtml}
+        <div style="padding-top:16px;border-top:1px solid var(--border)">
+          <div class="field">
+            <label>Add a user story</label>
+            <input type="text" id="us-input" placeholder="One state change, one sentence..."
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();addUserStory();}">
+          </div>
+          <div class="btn-row">
+            <button class="btn-primary btn-sm" onclick="addUserStory()">Add story</button>
+            <span style="font-size:11px;color:var(--muted)">Press Enter or click Add to save and continue adding</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function addUserStory() {
+  const input = document.getElementById('us-input');
+  const desc = input?.value?.trim();
+  if (!desc) return;
+  await api('POST', `/api/projects/${state.current.id}/cells/desired/user/queue`, {
+    description: desc, status: 'pending'
+  });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+  // Re-focus input after re-render
+  setTimeout(() => document.getElementById('us-input')?.focus(), 50);
+}
+
+function editUserStory(id) {
+  const item = state.current.cells['desired.user']?.queue?.find(i => i.id === id);
+  if (!item) return;
+  openModal(`
+    <h3>Edit User Story</h3>
+    <div class="field">
+      <label>Story</label>
+      <textarea id="us-edit-desc" rows="3">${esc(item.description || '')}</textarea>
+    </div>
+    <div class="btn-row mt16">
+      <button class="btn-primary" onclick="saveUserStory(${id})">Save</button>
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('us-edit-desc')?.focus(), 50);
+}
+
+async function saveUserStory(id) {
+  const description = document.getElementById('us-edit-desc').value.trim();
+  await api('PATCH', `/api/queue/${id}`, { description });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  closeModal();
+  renderProject();
+}
+
+async function deleteUserStory(id) {
+  if (!confirm('Remove this story?')) return;
+  await api('DELETE', `/api/queue/${id}`);
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+}
+
+
+function renderGateListStep(p, s) {
+  const stories = p.cells['desired.user']?.queue || [];
+
+  if (!stories.length) {
+    return `<div class="card"><div class="card-body" style="color:var(--muted)">No user stories found. Go back to Step 3 and add your user desired states first.</div></div>`;
+  }
+
+  const itemsHtml = stories.map(item => {
+    const status = item.status || 'pending';
+    const isActive   = status === 'active';
+    const isDeferred = status === 'deferred';
+    return `
+      <div class="queue-item ${isDeferred ? 'status-deferred' : isActive ? 'status-active' : ''}"
+           style="border-left:3px solid ${isDeferred ? 'var(--muted)' : isActive ? '#fbbf24' : 'var(--border2)'}">
+        <div class="queue-content">
+          <div class="queue-desc">${esc(item.description || '')}</div>
+        </div>
+        <div class="queue-controls" style="gap:6px">
+          <button class="btn-sm ${isActive ? 'btn-primary' : 'btn-ghost'}"
+                  onclick="setStoryGate(${item.id},'active')"
+                  title="Day one — must work at cutover">Day one</button>
+          <button class="btn-sm ${isDeferred ? 'btn-danger' : 'btn-ghost'}"
+                  onclick="setStoryGate(${item.id},'deferred')"
+                  title="Defer to second pass">Defer</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const activeCount   = stories.filter(s => s.status === 'active').length;
+  const deferredCount = stories.filter(s => s.status === 'deferred').length;
+  const unsetCount    = stories.length - activeCount - deferredCount;
+
+  return `
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label badge-user">User — Scope Gate</span>
+        <span class="state-tag tag-desired">desired</span>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:16px;margin-bottom:16px;font-size:12px;font-family:var(--mono)">
+          <span style="color:#fbbf24">● ${activeCount} day one</span>
+          <span style="color:var(--muted)">● ${deferredCount} deferred</span>
+          ${unsetCount ? `<span style="color:var(--warn)">● ${unsetCount} unset</span>` : ''}
+        </div>
+        <div class="queue-list">${itemsHtml}</div>
+        <div style="margin-top:16px;font-size:12px;color:var(--muted);line-height:1.7">
+          Mark each story <strong style="color:#fbbf24">Day one</strong> if users cannot do their jobs without it at cutover.<br>
+          Mark <strong style="color:#f87171">Defer</strong> if it's real and needed but can follow in a second pass.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function setStoryGate(id, status) {
+  await api('PATCH', `/api/queue/${id}`, { status });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+}
+
+
+
+
+function renderTestPlanStep(p, s) {
+  const userStories = p.cells['desired.user']?.queue || [];
+  const engDesired  = p.cells['desired.engineer']?.queue || [];
+  const queueItems  = p.cells['kinetic.engineer']?.queue || [];
+
+  const withAC    = queueItems.filter(i => (i.notes||'').match(/ac:/));
+  const withoutAC = queueItems.filter(i => !(i.notes||'').match(/ac:/));
+
+  // Summary bar
+  const summaryHtml = `
+    <div style="display:flex;gap:20px;margin-bottom:24px;font-size:12px;font-family:var(--mono)">
+      <span style="color:#4ade80">● ${withAC.length} with acceptance criteria</span>
+      <span style="color:var(--warn)">● ${withoutAC.length} missing criteria</span>
+      <span style="color:var(--muted)">● ${userStories.length} user stories</span>
+      <span style="color:var(--muted)">● ${engDesired.length} engineer desired states</span>
+    </div>`;
+
+  if (withoutAC.length) {
+    var missingHtml = `
+      <div style="background:rgba(200,121,65,.08);border:1px solid rgba(200,121,65,.3);border-radius:var(--r);padding:12px 16px;margin-bottom:20px;font-size:12px;color:var(--warn)">
+        ⚠ ${withoutAC.length} work item${withoutAC.length>1?'s are':' is'} missing acceptance criteria.
+        Go back to Step 5, edit each item, and add a criterion before the test plan is complete.
+      </div>`;
+  } else {
+    var missingHtml = '';
+  }
+
+  // Build test plan table rows
+  const rows = queueItems.map((item, idx) => {
+    const acMatch = (item.notes||'').match(/ac:([^|]+)/);
+    const ac = acMatch ? acMatch[1].trim() : '—';
+    const covMatch = (item.notes||'').match(/covers:([\d,]+)/);
+    const coveredIds = covMatch ? covMatch[1].split(',').map(Number) : [];
+    const coveredStates = coveredIds.map(cid => {
+      const dsIdx = engDesired.findIndex(d => d.id === cid);
+      return dsIdx >= 0 ? `#${dsIdx+1}` : '';
+    }).filter(Boolean).join(', ');
+
+    const statusColor = {
+      pending:'var(--muted)', active:'#fbbf24',
+      closed:'#4ade80', deferred:'var(--muted)', blocked:'#f87171'
+    }[item.status] || 'var(--muted)';
+
+    return `
+      <tr>
+        <td style="padding:10px 12px;vertical-align:top;font-family:var(--mono);font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)">${idx+1}</td>
+        <td style="padding:10px 12px;vertical-align:top;font-size:12px;border-bottom:1px solid var(--border)">${esc(item.description||'')}</td>
+        <td style="padding:10px 12px;vertical-align:top;font-size:12px;color:#7bb3e0;border-bottom:1px solid var(--border)">${esc(ac)}</td>
+        <td style="padding:10px 12px;vertical-align:top;font-size:11px;font-family:var(--mono);color:#6ecfa0;border-bottom:1px solid var(--border)">${coveredStates || '—'}</td>
+        <td style="padding:10px 12px;vertical-align:top;border-bottom:1px solid var(--border)">
+          <span class="status-pill pill-${item.status}" style="color:${statusColor}">${item.status}</span>
+        </td>
+      </tr>`;
+  }).join('');
+
+  const tableHtml = queueItems.length ? `
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--r2);overflow:hidden;border:1px solid var(--border)">
+        <thead>
+          <tr style="background:var(--surface2)">
+            <th style="padding:10px 12px;text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border2)">#</th>
+            <th style="padding:10px 12px;text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border2)">Condition</th>
+            <th style="padding:10px 12px;text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border2)">Acceptance Criterion</th>
+            <th style="padding:10px 12px;text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border2)">Satisfies</th>
+            <th style="padding:10px 12px;text-align:left;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border2)">Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>` : '<div style="color:var(--muted)">No work items yet. Complete Engineered States first.</div>';
+
+  // User story closure summary
+  const userSummary = userStories.length ? `
+    <div style="margin-top:24px">
+      <div style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px">User Story Coverage</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${userStories.map((us, i) => {
+          // A user story is covered if at least one closed queue item covers an eng desired state
+          const covered = queueItems.some(qi =>
+            qi.status === 'closed' &&
+            (qi.notes||'').match(/covers:/)
+          );
+          return `
+            <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r)">
+              <span style="font-family:var(--mono);font-size:11px;color:var(--muted);min-width:20px">${i+1}</span>
+              <span style="font-size:13px;flex:1">${esc(us.description||'')}</span>
+              <span style="font-size:11px;font-family:var(--mono);color:${covered?'#4ade80':'var(--muted)'}">
+                ${covered ? '✓ covered' : '○ pending'}
+              </span>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+  return `
+    ${summaryHtml}
+    ${missingHtml}
+    ${tableHtml}
+    ${userSummary}
+    <div class="btn-row mt16">
+      <button class="btn-ghost btn-sm" onclick="exportKineticView()">Export kinetic view</button>
+    </div>`;
+}
+
+
+async function exportProcedure(tagFilter) {
+  const p = state.current;
+  if (!p) return;
+
+  const engDesired  = p.cells['desired.engineer']?.queue || [];
+  const { executionOrder } = analyzeTopology(p);
+
+  const filtered = tagFilter
+    ? executionOrder.filter(e => !e.item || getTags(e.item).includes(tagFilter))
+    : executionOrder;
+
+  const projectName = p.name || 'KRM Project';
+  const filterNote  = tagFilter ? ` — filtered by tag: ${tagFilter}` : '';
+  const date = new Date().toISOString().slice(0,10);
+
+  let md = `# ${projectName} — Procedure${filterNote}\n`;
+  md += `*Generated ${date} from KRM topological sort*\n\n`;
+
+  if (p.cells['desired.stakeholder']?.story) {
+    md += `**Goal:** ${p.cells['desired.stakeholder'].story}\n\n`;
+  }
+
+  md += `---\n\n`;
+
+  let stepNum = 1;
+  let lastEnabledStates = [];
+
+  filtered.forEach(({ item, enables, inCycle }) => {
+    if (!item) return;
+
+    const tags = getTags(item);
+    const acM  = (item.notes||'').match(/ac:([^|]+)/);
+    const ac   = acM ? acM[1].trim().replace(/depends_on:\d+/g,'').replace(/declared:[\d,]+/g,'').trim() : null;
+
+    // State completion marker
+    const enablesNames = enables.map(sid => {
+      const s = engDesired.find(d => d.id === sid);
+      return s ? s.description : null;
+    }).filter(Boolean);
+
+    md += `### ${stepNum}. ${item.description || ''}\n`;
+
+    if (inCycle) md += `> ⛔ **Warning:** This item is part of a circular dependency and may not be executable.\n`;
+
+    if (ac) md += `**Verification:** ${ac}\n`;
+
+    if (enablesNames.length) {
+      md += `**Enables:** ${enablesNames.join('; ')}\n`;
+    }
+
+    if (tags.length) md += `**Tags:** ${tags.join(', ')}\n`;
+
+    md += `**Status:** ${item.status}\n\n`;
+    stepNum++;
+  });
+
+  // Engineered state summary
+  md += `---\n\n## Engineered State Completion\n\n`;
+  engDesired.forEach((state, idx) => {
+    const allItems = p.cells['kinetic.engineer']?.queue || [];
+    const required = allItems.filter(wi => getDeclaredDeps(wi).includes(state.id));
+    const closed   = required.filter(wi => wi.status === 'closed').length;
+    const pct = required.length ? Math.round((closed/required.length)*100) : 0;
+    md += `${idx+1}. **${state.description}** — ${closed}/${required.length} work items closed (${pct}%)\n`;
+  });
+
+  const filename = `${projectName.toLowerCase().replace(/[^a-z0-9]+/g,'-')}-procedure${tagFilter?'-'+tagFilter:''}.md`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([md], {type:'text/markdown'}));
+  a.download = filename;
+  a.click();
+}
+
+async function exportKineticView() {
+  if (!state.current) return;
+  const p = state.current;
+  const userStories = p.cells['desired.user']?.queue || [];
+  const engDesired  = p.cells['desired.engineer']?.queue || [];
+  const queueItems  = p.cells['kinetic.engineer']?.queue || [];
+
+  let md = `# Test Plan — ${p.name}\n\n`;
+  if (p.description) md += `${p.description}\n\n`;
+  md += `---\n\n## Work Items — Acceptance Criteria\n\n`;
+  md += `| # | Condition | Acceptance Criterion | Satisfies | Status |\n`;
+  md += `|---|---|---|---|---|\n`;
+
+  queueItems.forEach((item, idx) => {
+    const acMatch = (item.notes||'').match(/ac:([^|]+)/);
+    const ac = acMatch ? acMatch[1].trim() : '—';
+    const covMatch = (item.notes||'').match(/covers:([\d,]+)/);
+    const coveredIds = covMatch ? covMatch[1].split(',').map(Number) : [];
+    const coveredStates = coveredIds.map(cid => {
+      const dsIdx = engDesired.findIndex(d => d.id === cid);
+      return dsIdx >= 0 ? `#${dsIdx+1}` : '';
+    }).filter(Boolean).join(', ');
+    md += `| ${idx+1} | ${item.description||''} | ${ac} | ${coveredStates||'—'} | ${item.status} |\n`;
+  });
+
+  md += `\n---\n\n## User Stories\n\n`;
+  userStories.forEach((us, i) => {
+    md += `${i+1}. ${us.description||''}\n`;
+  });
+
+  md += `\n---\n\n## Engineer Desired States\n\n`;
+  engDesired.forEach((ds, i) => {
+    md += `${i+1}. ${ds.description||''}\n`;
+  });
+
+  const filename = `kinetic-${p.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}.md`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([md], {type:'text/markdown'}));
+  a.download = filename;
+  a.click();
+}
+
+
+
+
+// ── Tag helpers ───────────────────────────────────────────────────────────
+
+function getTags(item) {
+  const m = (item.notes||'').match(/tags:([^|\n]+)/);
+  if (!m) return [];
+  return m[1].split(',').map(t => t.trim()).filter(Boolean);
+}
+
+function getAllTags(p) {
+  const items = p.cells['kinetic.engineer']?.queue || [];
+  const tagSet = new Set();
+  items.forEach(item => getTags(item).forEach(t => tagSet.add(t)));
+  return [...tagSet].sort();
+}
+
+function renderTagBadges(tags) {
+  if (!tags.length) return '';
+  return tags.map(t => `<span style="
+    font-size:10px;font-family:var(--mono);
+    background:rgba(168,85,247,.15);color:#c084fc;
+    border-radius:3px;padding:1px 6px;border:1px solid rgba(168,85,247,.25)
+  ">${esc(t)}</span>`).join(' ');
+}
+
+// ── Dependency highlighting ───────────────────────────────────────────────
+
+function getDeclaredDeps(item) {
+  // Returns array of engineered state IDs this condition declares dependency on
+  const m = (item.notes||'').match(/declared:([\d,]+)/);
+  return m ? m[1].split(',').map(Number) : [];
+}
+
+function setDepFocus(type, id) {
+  depFocus = (depFocus?.type === type && depFocus?.id === id) ? null : { type, id };
+  applyDepHighlight();
+}
+
+
+function addTagToInput(tag) {
+  const el = document.getElementById('edit-tags');
+  if (!el) return;
+  const existing = el.value.split(',').map(t => t.trim()).filter(Boolean);
+  if (!existing.includes(tag)) {
+    el.value = existing.length ? existing.join(', ') + ', ' + tag : tag;
+  }
+}
+
+function previewPrereqHighlight(selectEl, itemId) {
+  // Highlight selected prereq items in the queue
+  const selectedIds = Array.from(selectEl.selectedOptions).map(o => parseInt(o.value));
+  document.querySelectorAll('.cond-item').forEach(el => {
+    const cid = parseInt(el.dataset.id);
+    if (selectedIds.includes(cid)) {
+      el.classList.add('dep-highlight'); el.classList.remove('dep-dim');
+    } else if (selectedIds.length) {
+      el.classList.add('dep-dim'); el.classList.remove('dep-highlight');
+    } else {
+      el.classList.remove('dep-highlight','dep-dim');
+    }
+  });
+}
+
+function previewDepHighlight(selectEl) {
+  // Highlight eng states matching current selection without saving
+  const selectedIds = Array.from(selectEl.selectedOptions).map(o => parseInt(o.value));
+  const engItems  = document.querySelectorAll('.eng-state-item');
+  const condItems = document.querySelectorAll('.cond-item');
+
+  if (!selectedIds.length) {
+    engItems.forEach(el  => { el.classList.remove('dep-highlight','dep-dim'); });
+    condItems.forEach(el => { el.classList.remove('dep-highlight','dep-dim'); });
+    return;
+  }
+
+  engItems.forEach(el => {
+    const eid = parseInt(el.dataset.id);
+    if (selectedIds.includes(eid)) {
+      el.classList.add('dep-highlight'); el.classList.remove('dep-dim');
+    } else {
+      el.classList.add('dep-dim'); el.classList.remove('dep-highlight');
+    }
+  });
+}
+
+function applyDepHighlight() {
+  const engItems  = document.querySelectorAll('.eng-state-item');
+  const condItems = document.querySelectorAll('.cond-item');
+
+  if (!depFocus) {
+    engItems.forEach(el  => { el.classList.remove('dep-highlight','dep-dim'); });
+    condItems.forEach(el => { el.classList.remove('dep-highlight','dep-dim'); });
+    return;
+  }
+
+  const p = state.current;
+  const engDesired = p.cells['desired.engineer']?.queue || [];
+  const queueItems = p.cells['kinetic.engineer']?.queue || [];
+
+  if (depFocus.type === 'eng') {
+    // Highlight conditions that declare dependency on this eng state
+    condItems.forEach(el => {
+      const cid = parseInt(el.dataset.id);
+      const item = queueItems.find(i => i.id === cid);
+      const deps = item ? getDeclaredDeps(item) : [];
+      if (deps.includes(depFocus.id)) {
+        el.classList.add('dep-highlight'); el.classList.remove('dep-dim');
+      } else {
+        el.classList.add('dep-dim'); el.classList.remove('dep-highlight');
+      }
+    });
+    engItems.forEach(el => {
+      const eid = parseInt(el.dataset.id);
+      if (eid === depFocus.id) {
+        el.classList.add('dep-highlight'); el.classList.remove('dep-dim');
+      } else {
+        el.classList.add('dep-dim'); el.classList.remove('dep-highlight');
+      }
+    });
+  } else {
+    // Highlight eng states that this condition declares dependency on
+    const item = queueItems.find(i => i.id === depFocus.id);
+    const deps = item ? getDeclaredDeps(item) : [];
+    engItems.forEach(el => {
+      const eid = parseInt(el.dataset.id);
+      if (deps.includes(eid)) {
+        el.classList.add('dep-highlight'); el.classList.remove('dep-dim');
+      } else {
+        el.classList.add('dep-dim'); el.classList.remove('dep-highlight');
+      }
+    });
+    condItems.forEach(el => {
+      const cid = parseInt(el.dataset.id);
+      if (cid === depFocus.id) {
+        el.classList.add('dep-highlight'); el.classList.remove('dep-dim');
+      } else {
+        el.classList.add('dep-dim'); el.classList.remove('dep-highlight');
+      }
+    });
+  }
+}
+
+function renderEngineeredCombined(p) {
+  // Left panel: Engineered Desired States (list builder)
+  const engDesired = p.cells['desired.engineer']?.queue || [];
+
+  const desiredListHtml = engDesired.length
+    ? engDesired.map((item, idx) => {
+        const depCount = (p.cells['kinetic.engineer']?.queue||[]).filter(c => getDeclaredDeps(c).includes(item.id)).length;
+        return `
+        <div class="queue-item dep-item eng-state-item" data-id="${item.id}"
+          style="border-left:3px solid var(--eng);cursor:pointer"
+          onclick="setDepFocus('eng',${item.id})">
+          <div class="queue-num">${idx+1}</div>
+          <div class="queue-content">
+            <div class="queue-desc">${esc(item.description||'')}</div>
+            ${depCount ? `<div><span class="dep-declared">requires ${depCount} work item${depCount>1?'s':''}</span></div>` : '<div style="font-size:10px;color:var(--warn);margin-top:2px">⚠ no work items declared</div>'}
+          </div>
+          <div class="queue-controls">
+            <button class="btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();editEngStory(${item.id})" title="Edit">✎</button>
+            <button class="btn-danger btn-icon btn-sm" onclick="event.stopPropagation();deleteEngStory(${item.id})" title="Remove">✕</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--muted);font-size:12px;margin-bottom:8px">No entries yet.</div>';
+
+  const leftPanel = `
+    <div style="display:flex;flex-direction:column;gap:0;height:100%">
+      <div class="card" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div class="card-header">
+          <span class="card-label badge-engineer">Engineered States</span>
+          <span style="font-size:11px;font-family:var(--mono);color:var(--muted)">${engDesired.length} states</span>
+        </div>
+        <div class="card-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+            What must be technically true for user stories to be achievable. One end state per entry.
+          </div>
+          <div style="flex:1;margin-bottom:12px">${desiredListHtml}</div>
+          <div style="padding-top:12px;border-top:1px solid var(--border)">
+            <div class="field">
+              <label>Add engineered state</label>
+              <input type="text" id="eng-combined-input"
+                placeholder="&quot;[X] is [condition]&quot; at technical level..."
+                onkeydown="if(event.key==='Enter'){event.preventDefault();addEngCombined();}">
+            </div>
+            <div class="resolution-hint" style="margin-bottom:10px">
+              <span class="good">✓</span> Technical end state, one sentence<br>
+              <span class="bad">✗</span> Work item ("migrate X") or wrong level ("user can send mail")
+            </div>
+            <button class="btn-primary btn-sm" onclick="addEngCombined()">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // Right panel: full Work Items editor
+  const queueCell  = p.cells['kinetic.engineer'] || {};
+  const queueItems = queueCell.queue || [];
+
+  const queueListHtml = queueItems.length
+    ? queueItems.map(item => {
+        const declaredDeps = getDeclaredDeps(item);
+        const depLabels = declaredDeps.map(did => {
+          const ds = engDesired.find(d => d.id === did);
+          const idx = engDesired.indexOf(ds);
+          return ds ? `<span class="dep-declared">#${idx+1}</span>` : '';
+        }).join(' ');
+        return `
+        <div class="queue-item status-${item.status} dep-item cond-item" id="qi-${item.id}" data-id="${item.id}"
+          style="cursor:pointer" onclick="if(!event.target.closest('button')){setDepFocus('cond',${item.id});}">
+          <div class="queue-num">${item.order_num}</div>
+          <div class="queue-content">
+            <div class="queue-desc">${esc(item.description||'')}</div>
+            ${declaredDeps.length ? `<div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap;align-items:center"><span style="font-size:10px;color:var(--muted);font-family:var(--mono)">Enables:</span>${depLabels}</div>` : ''}
+            ${(() => { const tags = getTags(item); return tags.length ? `<div style="margin-top:3px;display:flex;gap:3px;flex-wrap:wrap">${renderTagBadges(tags)}</div>` : ''; })()}
+            ${(() => {
+              const acM = (item.notes||'').match(/ac:([^|]+)/);
+              const splitM = (item.notes||'').match(/split_from:(\d+)/);
+              const notesClean = (item.notes||'').replace(/ac:[^|]+/g,'').replace(/covers:[\d,]+/g,'').replace(/split_from:\d+/g,'').replace(/upstream_for:\d+/g,'').replace(/depends_on:\d+/g,'').replace(/order_num:\d+/g,'').replace(/has_upstream:\d+/g,'').replace(/declared:[\d,]+/g,'').replace(/promoted[_a-z]*/g,'').replace(/\|/g,'').trim();
+              const splitTag = splitM ? (() => { const p2 = (p.cells['desired.engineer']?.queue||[]).find(d=>d.id===parseInt(splitM[1])); const idx=engDesired.indexOf(p2); return p2?`<div class="queue-notes" style="color:var(--muted)">↳ split from state #${idx+1}</div>`:''})() : '';
+              const acClean = acM ? acM[1].trim().replace(/depends_on:\d+/g,'').replace(/declared:[\d,]+/g,'').trim() : '';
+              return (acClean ? `<div class="queue-notes" style="color:#7bb3e0">✓ AC: ${esc(acClean)}</div>` : '<div class="queue-notes" style="color:var(--warn)">⚠ No acceptance criterion</div>') + splitTag + (notesClean?`<div class="queue-notes">${esc(notesClean)}</div>`:'');
+            })()}
+            ${(() => {
+              const covM = (item.notes||'').match(/covers:([\d,]+)/);
+              if (!covM || item.status !== 'closed') return '';
+              const ids = covM[1].split(',').map(Number);
+              const labels = ids.map(cid => { const idx=engDesired.findIndex(d=>d.id===cid); return idx>=0?`<span style="font-size:10px;background:rgba(74,222,128,.15);color:#4ade80;border-radius:3px;padding:1px 5px">#${idx+1}</span>`:'';}).join(' ');
+              return `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">${labels}</div>`;
+            })()}
+          </div>
+          <div class="queue-controls">
+            <span class="status-pill pill-${item.status}">${item.status}</span>
+            <button class="btn-ghost btn-icon btn-sm" onclick="editQueueItem(${item.id})" title="Edit">✎</button>
+            <button class="btn-danger btn-icon btn-sm" onclick="deleteQueueItem(${item.id})" title="Delete">✕</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--muted);font-size:13px;margin-bottom:16px">No work items yet. Add in execution order.</div>';
+
+  const rightPanel = `
+    <div style="display:flex;flex-direction:column;height:100%">
+      <div class="card" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div class="card-header">
+          <span class="card-label badge-engineer">Work Items</span>
+          <span class="state-tag tag-kinetic">kinetic</span>
+          <span style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-left:auto">
+            ${queueItems.filter(i=>i.status==='closed').length}/${queueItems.length} closed
+          </span>
+        </div>
+        <div class="card-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+            Ordered conditions that achieve the engineered states. State not work. Order = dependency.
+          </div>
+          <div style="flex:1;margin-bottom:12px">
+            <div class="queue-list">${queueListHtml}</div>
+          </div>
+          <div style="padding-top:12px;border-top:1px solid var(--border)">
+            <div class="field">
+              <label>Add work item</label>
+              <input type="text" id="qi-desc"
+                placeholder="Describe the condition that must be true...">
+            </div>
+            <div class="resolution-hint" style="margin-bottom:10px">
+              <span class="good">✓ State:</span> "[X] is [condition]" &nbsp;
+              <span class="bad">✗ Work:</span> "Export X" / "Write Y"
+            </div>
+            <div class="field">
+              <label>Notes (optional)</label>
+              <input type="text" id="qi-notes" placeholder="Blockers, observations, notes...">
+            </div>
+            <button class="btn-primary btn-sm" onclick="addQueueItem()">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  return `
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:20px;height:calc(100vh - 220px)">
+      ${leftPanel}
+      ${rightPanel}
+    </div>`;
+}
+
+async function addEngCombined() {
+  const desc = document.getElementById('eng-combined-input')?.value?.trim();
+  if (!desc) return;
+  await api('POST', `/api/projects/${state.current.id}/cells/desired/engineer/queue`, {
+    description: desc, status: 'pending'
+  });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderStep();
+  setTimeout(() => document.getElementById('eng-combined-input')?.focus(), 50);
+}
+
+function renderEngListStep(p, s) {
+  const userStories = p.cells['desired.user']?.queue || [];
+  const engStories = p.cells['desired.engineer']?.queue || [];
+
+  const userRef = userStories.length ? `
+    <div class="gate-summary" style="margin-bottom:20px">
+      <strong>User stories — what users need to be true:</strong>
+      ${userStories.map((st, i) => `<span style="display:block;margin-top:4px">${i+1}. ${esc(st.description||'')}</span>`).join('')}
+    </div>` : '';
+
+  let listHtml = '';
+  if (engStories.length) {
+    listHtml = '<div class="queue-list" style="margin-bottom:16px">' +
+      engStories.map((item, idx) => `
+        <div class="queue-item" style="border-left:3px solid var(--eng)">
+          <div class="queue-num">${idx+1}</div>
+          <div class="queue-content">
+            <div class="queue-desc">${esc(item.description||'')}</div>
+          </div>
+          <div class="queue-controls">
+            <button class="btn-ghost btn-icon btn-sm" onclick="editEngStory(${item.id})" title="Edit">✎</button>
+            <button class="btn-danger btn-icon btn-sm" onclick="deleteEngStory(${item.id})" title="Remove">✕</button>
+          </div>
+        </div>
+      `).join('') +
+    '</div>';
+  } else {
+    listHtml = '<div style="color:var(--muted);font-size:13px;margin-bottom:16px">No engineer desired states yet. Add the first one below.</div>';
+  }
+
+  return `
+    ${userRef}
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label badge-engineer">Engineer — Desired States</span>
+        <span class="state-tag tag-desired">desired</span>
+      </div>
+      <div class="card-body">
+        ${listHtml}
+        <div style="padding-top:16px;border-top:1px solid var(--border)">
+          <div class="field">
+            <label>Add an engineer desired state</label>
+            <input type="text" id="eng-list-input"
+              placeholder="One technical end state, one sentence..."
+              onkeydown="if(event.key==='Enter'){event.preventDefault();addEngStory();}">
+          </div>
+          <div class="resolution-hint" style="margin-bottom:12px">
+            <span class="good">✓ Correct:</span> Technical end state · One sentence · No user-experience language<br>
+            <span class="bad">✗ Implementation step:</span> "Migrate the mailbox" &nbsp;
+            <span class="bad">✗ Wrong row:</span> "User can open Outlook"
+          </div>
+          <div class="btn-row">
+            <button class="btn-primary btn-sm" onclick="addEngStory()">Add</button>
+            <span style="font-size:11px;color:var(--muted)">Press Enter or click Add — keep going until the list feels complete</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function addEngStory() {
+  const input = document.getElementById('eng-list-input');
+  const desc = input?.value?.trim();
+  if (!desc) return;
+  await api('POST', `/api/projects/${state.current.id}/cells/desired/engineer/queue`, {
+    description: desc, status: 'pending'
+  });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+  setTimeout(() => document.getElementById('eng-list-input')?.focus(), 50);
+}
+
+function editEngStory(id) {
+  const item = state.current.cells['desired.engineer']?.queue?.find(i => i.id === id);
+  if (!item) return;
+  openModal(`
+    <h3>Edit Engineer Desired State</h3>
+    <div class="field">
+      <label>State</label>
+      <textarea id="eng-edit-desc" rows="3">${esc(item.description||'')}</textarea>
+    </div>
+    <div class="btn-row mt16">
+      <button class="btn-primary" onclick="saveEngStory(${id})">Save</button>
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('eng-edit-desc')?.focus(), 50);
+}
+
+async function saveEngStory(id) {
+  const description = document.getElementById('eng-edit-desc').value.trim();
+  await api('PATCH', `/api/queue/${id}`, { description });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  closeModal();
+  renderProject();
+}
+
+async function deleteEngStory(id) {
+  if (!confirm('Remove this engineer desired state?')) return;
+  await api('DELETE', `/api/queue/${id}`);
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+}
+
+function renderEngineerDesiredList(p, s) {
+  const userStories = p.cells['desired.user']?.queue || [];
+  const engCell = p.cells['desired.engineer'] || {};
+  const engStories = engCell.queue || [];
+
+  if (!userStories.length) {
+    return `<div class="card"><div class="card-body" style="color:var(--muted)">No user stories found. Go back to Step 3 and add your user desired states first.</div></div>`;
+  }
+
+  // Build a map of eng stories by their notes field which we'll use to store the parent user story id
+  // Each eng queue item notes field stores "user_story_id:<id>"
+  const engByUser = {};
+  engStories.forEach(item => {
+    const match = (item.notes || '').match(/^user_story_id:(\d+)/);
+    if (match) engByUser[match[1]] = item;
+  });
+
+  const cardsHtml = userStories.map(us => {
+    const existing = engByUser[us.id];
+    const val = existing?.description || '';
+    return `
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-header">
+          <span style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em">User story</span>
+        </div>
+        <div class="card-body" style="padding-bottom:8px">
+          <div style="font-size:13px;margin-bottom:14px;color:var(--text)">${esc(us.description || '')}</div>
+          <div class="field">
+            <label>Engineer desired state</label>
+            <textarea id="eng-des-${us.id}" rows="3"
+              placeholder="What does done look like technically? One sentence, one state change.">${esc(val)}</textarea>
+            <div class="resolution-hint">
+              <span class="good">✓ Correct:</span> Technical end state, one sentence, no user-experience language<br>
+              <span class="bad">✗ Too broad:</span> "Email works" &nbsp;
+              <span class="bad">✗ Wrong row:</span> "User can open Outlook and see their inbox"
+            </div>
+          </div>
+          <button class="btn-primary btn-sm" onclick="saveEngDesired(${us.id}, ${existing ? existing.id : 'null'})">Save</button>
+          ${val ? `<span style="font-size:11px;color:var(--muted);margin-left:10px">✓ Saved</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return cardsHtml;
+}
+
+async function saveEngDesired(userStoryId, existingItemId) {
+  const desc = document.getElementById(`eng-des-${userStoryId}`)?.value?.trim();
+  if (!desc) return;
+  if (existingItemId) {
+    await api('PATCH', `/api/queue/${existingItemId}`, { description: desc });
+  } else {
+    await api('POST', `/api/projects/${state.current.id}/cells/desired/engineer/queue`, {
+      description: desc,
+      status: 'pending',
+      notes: `user_story_id:${userStoryId}`
+    });
+  }
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+}
+
+
+function renderStakeholderStates(p) {
+  const cur  = p.cells['current.stakeholder']?.story  || '';
+  const kin  = p.cells['kinetic.stakeholder']?.story  || '';
+  const des  = p.cells['desired.stakeholder']?.story  || '';
+
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label" style="color:#7bb3e0">Current State</span>
+          <span class="state-tag tag-current">current</span>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label>Where things are now</label>
+            <textarea id="sh-current" rows="4" placeholder="One sentence. What is true today from the stakeholder perspective?">${esc(cur)}</textarea>
+          </div>
+          <button class="btn-primary btn-sm" onclick="saveStakeholderState('current')">Save</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label" style="color:#e0b96e">Kinetic State</span>
+          <span class="state-tag tag-kinetic">kinetic</span>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label>The transition — what is set in motion</label>
+            <textarea id="sh-kinetic" rows="4" placeholder="One sentence. What is being directed or enacted to close the gap?">${esc(kin)}</textarea>
+          </div>
+          <button class="btn-primary btn-sm" onclick="saveStakeholderState('kinetic')">Save</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label" style="color:#6ecfa0">Desired State</span>
+          <span class="state-tag tag-desired">desired</span>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label>The fixed point — what success looks like</label>
+            <textarea id="sh-desired" rows="4" placeholder="One sentence. This is the anchor — everything else is derived from it.">${esc(des)}</textarea>
+          </div>
+          <button class="btn-primary btn-sm" onclick="saveStakeholderState('desired')">Save</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function saveStakeholderState(st) {
+  const val = document.getElementById(`sh-${st}`)?.value?.trim();
+  await api('PATCH', `/api/projects/${state.current.id}/cells/${st}/stakeholder`, { story: val });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  // Re-render just the textarea value to avoid losing focus
+  document.getElementById(`sh-${st}`).value = val;
+}
+
+function renderUserStates(p) {
+  const cur  = p.cells['current.user']?.queue   || [];
+  const kin  = p.cells['kinetic.user']?.queue   || [];
+  const des  = p.cells['desired.user']?.queue   || [];
+
+  function columnHtml(st, items, label, tagClass, color, placeholder) {
+    const listHtml = items.length
+      ? items.map((item, idx) => `
+          <div class="queue-item" style="border-left:3px solid var(--user)">
+            <div class="queue-num">${idx+1}</div>
+            <div class="queue-content"><div class="queue-desc">${esc(item.description||'')}</div></div>
+            <div class="queue-controls">
+              <button class="btn-danger btn-icon btn-sm" onclick="deleteUserStateItem(${item.id},'${st}')">✕</button>
+            </div>
+          </div>`).join('')
+      : `<div style="color:var(--muted);font-size:12px;margin-bottom:8px">No entries yet.</div>`;
+
+    return `
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label" style="color:${color}">${label}</span>
+          <span class="state-tag tag-${st}">${st}</span>
+        </div>
+        <div class="card-body">
+          <div style="margin-bottom:12px">${listHtml}</div>
+          <div class="field">
+            <input type="text" id="usr-input-${st}"
+              placeholder="${placeholder}"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();addUserStateItem('${st}');}">
+          </div>
+          <button class="btn-primary btn-sm" onclick="addUserStateItem('${st}')">Add</button>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      ${columnHtml('current', cur, 'Current State', 'tag-current', '#7bb3e0', 'What users can do now...')}
+      ${columnHtml('kinetic', kin, 'Kinetic State', 'tag-kinetic', '#e0b96e', 'What users experience during transition...')}
+      ${columnHtml('desired', des, 'Desired State', 'tag-desired', '#6ecfa0', 'What users need to be able to do...')}
+    </div>`;
+}
+
+async function addUserStateItem(st) {
+  const desc = document.getElementById(`usr-input-${st}`)?.value?.trim();
+  if (!desc) return;
+  await api('POST', `/api/projects/${state.current.id}/cells/${st}/user/queue`, {
+    description: desc, status: 'pending'
+  });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderStep();
+  setTimeout(() => document.getElementById(`usr-input-${st}`)?.focus(), 50);
+}
+
+async function deleteUserStateItem(id, st) {
+  await api('DELETE', `/api/queue/${id}`);
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderStep();
+}
+
+function renderQueueStep(p, s) {
+  const queueCell  = p.cells['kinetic.engineer'] || {};
+  const queueItems = queueCell.queue || [];
+  const engDesired = p.cells['desired.engineer']?.queue || [];
+
+  const desiredPanel = `
+    <div style="
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:var(--r2);
+      overflow:hidden;
+    ">
+      <div style="
+        padding:10px 14px;
+        border-bottom:1px solid var(--border);
+        font-size:11px;
+        font-family:var(--mono);
+        letter-spacing:.08em;
+        text-transform:uppercase;
+        color:var(--muted);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+      ">
+        <span class="badge-engineer">Engineer Desired States</span>
+        <span style="color:var(--muted)">${engDesired.length}</span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+        ${engDesired.length
+          ? engDesired.map((ds, i) => `
+              <div style="display:flex;gap:10px;align-items:flex-start">
+                <span style="
+                  font-family:var(--mono);font-size:10px;
+                  color:var(--muted);min-width:18px;padding-top:2px
+                ">${i+1}</span>
+                <span style="font-size:12px;line-height:1.5;color:var(--text)">${esc(ds.description||'')}</span>
+              </div>`).join('')
+          : '<span style="color:var(--muted);font-size:12px">No desired states yet — go back to Step 4.</span>'
+        }
+      </div>
+    </div>`;
+
+  const queueListHtml = queueItems.length
+    ? queueItems.map(item => {
+        const declaredDeps = getDeclaredDeps(item);
+        const depLabels = declaredDeps.map(did => {
+          const ds = engDesired.find(d => d.id === did);
+          const idx = engDesired.indexOf(ds);
+          return ds ? `<span class="dep-declared">#${idx+1}</span>` : '';
+        }).join(' ');
+        return `
+        <div class="queue-item status-${item.status} dep-item cond-item" id="qi-${item.id}" data-id="${item.id}"
+          style="cursor:pointer" onclick="event.target.closest('button') || setDepFocus('cond',${item.id})">
+          <div class="queue-num">${item.order_num}</div>
+          <div class="queue-content">
+            <div class="queue-desc">${esc(item.description||'')}</div>
+            ${declaredDeps.length ? `<div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">${depLabels}</div>` : ''}
+            ${(() => {
+              const acM = (item.notes||'').match(/ac:([^|]+)/);
+              const splitM = (item.notes||'').match(/split_from:(\d+)/);
+              const notesClean = (item.notes||'').replace(/ac:[^|]+/g,'').replace(/covers:[\d,]+/g,'').replace(/split_from:\d+/g,'').replace(/\|/g,'').trim();
+              const splitTag = splitM ? (() => {
+                const parent = (p.cells['desired.engineer']?.queue||[]).find(d => d.id === parseInt(splitM[1]));
+                const parentIdx = (p.cells['desired.engineer']?.queue||[]).indexOf(parent);
+                return parent ? `<div class="queue-notes" style="color:var(--muted)">↳ split from desired #${parentIdx+1}</div>` : '';
+              })() : '';
+              const upstreamM = (item.notes||'').match(/upstream_for:(\d+)/);
+              const dependsM  = (item.notes||'').match(/depends_on:(\d+)/);
+              const upstreamTag = upstreamM ? `<div class="queue-notes" style="color:#7bb3e0">⬅ upstream dependency</div>` : '';
+              const dependsTag  = dependsM  ? `<div class="queue-notes" style="color:var(--muted)">depends on upstream item</div>` : '';
+              return (acM ? `<div class="queue-notes" style="color:#7bb3e0">✓ AC: ${esc(acM[1].trim())}</div>` : '<div class="queue-notes" style="color:var(--warn)">⚠ No acceptance criterion — click edit to add one</div>') +
+                splitTag + upstreamTag + dependsTag +
+                (notesClean ? `<div class="queue-notes">${esc(notesClean)}</div>` : '');
+            })()}
+            ${(() => {
+              const m = (item.notes||'').match(/covers:([\d,]+)/);
+              if (!m || item.status !== 'closed') return '';
+              const ids = m[1].split(',').map(Number);
+              const labels = ids.map(cid => {
+                const idx = engDesired.findIndex(d => d.id === cid);
+                return idx >= 0 ? `<span style="font-size:10px;background:rgba(74,222,128,.15);color:#4ade80;border-radius:3px;padding:1px 5px">#${idx+1}</span>` : '';
+              }).join(' ');
+              return `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">${labels}</div>`;
+            })()}
+          </div>
+          <div class="queue-controls">
+            <span class="status-pill pill-${item.status}">${item.status}</span>
+            <button class="btn-ghost btn-icon btn-sm" onclick="editQueueItem(${item.id})" title="Edit">✎</button>
+            <button class="btn-danger btn-icon btn-sm" onclick="deleteQueueItem(${item.id})" title="Delete">✕</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--muted);font-size:13px;margin-bottom:16px">No work items yet. Add the first — order determines dependency.</div>';
+
+  const queuePanel = `
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label badge-engineer">Work Items</span>
+          <span class="state-tag tag-kinetic">kinetic</span>
+        </div>
+        <div class="card-body">
+          <div class="queue-list" style="margin-bottom:16px">${queueListHtml}</div>
+          <div style="padding-top:16px;border-top:1px solid var(--border)">
+            <div class="field">
+              <label>Add work item</label>
+              <input type="text" id="qi-desc"
+                placeholder="Describe the condition that must be true...">
+            </div>
+            <div class="resolution-hint" style="margin-bottom:12px">
+              <span class="good">✓ State:</span> "[X] is [condition]" — true or false, no work verbs<br>
+              <span class="bad">✗ Work:</span> "Export account data" / "Write the script" / any action verb
+            </div>
+            <div class="field">
+              <label>Notes (optional)</label>
+              <input type="text" id="qi-notes" placeholder="Blockers, observations, notes...">
+            </div>
+            <button class="btn-primary btn-sm" onclick="addQueueItem()">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  return `
+    <div style="
+      display:grid;
+      grid-template-columns:300px 1fr;
+      gap:20px;
+      align-items:start;
+      height:calc(100vh - 180px);
+    ">
+      <div style="
+        position:sticky;
+        top:0;
+        height:calc(100vh - 180px);
+        overflow-y:auto;
+      ">${desiredPanel}</div>
+      <div style="
+        height:calc(100vh - 180px);
+        overflow-y:auto;
+        padding-right:4px;
+      ">${queuePanel}</div>
+    </div>`;
+}
+
+function renderKineticStep(p) {
+  const roles = ['stakeholder','user','engineer'];
+  const roleLabels = {stakeholder:'Owner / Stakeholder', user:'User', engineer:'Engineer'};
+
+  return roles.map(role => {
+    const key = `kinetic.${role}`;
+    const cell = p.cells[key] || {};
+    const val = cell.story || '';
+    const currentCell = p.cells[`current.${role}`] || {};
+    const desiredCell = p.cells[`desired.${role}`] || {};
+
+    return `
+      <div class="card">
+        <div class="card-header">
+          <span class="card-label badge-${role}">${roleLabels[role]}</span>
+          <span class="state-tag tag-kinetic">kinetic</span>
+        </div>
+        <div class="card-body">
+          ${currentCell.story || desiredCell.story ? `
+          <div class="two-col" style="margin-bottom:16px;font-size:12px;">
+            <div><span style="color:var(--muted);font-family:var(--mono);font-size:10px;text-transform:uppercase">Current</span><br>${esc(currentCell.story || '—')}</div>
+            <div><span style="color:var(--muted);font-family:var(--mono);font-size:10px;text-transform:uppercase">Desired</span><br>${esc(desiredCell.story || '—')}</div>
+          </div>` : ''}
+          <div class="field">
+            <label>Kinetic story — what must happen to move from current to desired?</label>
+            <textarea rows="3" id="kinetic-${role}" placeholder="One sentence describing the transition mechanism.">${esc(val)}</textarea>
+          </div>
+          <button class="btn-primary btn-sm" onclick="saveField('kinetic','${role}','story')">Save</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+
+// ── Topology Analysis Engine ──────────────────────────────────────────────
+
+function analyzeTopology(p) {
+  const engDesired = p.cells['desired.engineer']?.queue || [];
+  const workItems  = p.cells['kinetic.engineer']?.queue  || [];
+
+  // Build adjacency: item id → set of prerequisite item ids
+  // Prerequisites come from upstream_for tags: if item B has upstream_for:A,
+  // then A is a prerequisite of B (A must come before B)
+  const prereqOf = {}; // itemId → [prerequisiteIds]
+  const enabledBy = {}; // stateId → [itemIds]
+  const itemEnables = {}; // itemId → [stateIds]
+
+  workItems.forEach(item => {
+    prereqOf[item.id] = [];
+    itemEnables[item.id] = getDeclaredDeps(item); // states this item enables
+    itemEnables[item.id].forEach(sid => {
+      if (!enabledBy[sid]) enabledBy[sid] = [];
+      enabledBy[sid].push(item.id);
+    });
+  });
+
+  // Build prerequisite relationships from upstream_for tags
+  // If item B was created as upstream_for:A, then B is a prerequisite of A
+  workItems.forEach(item => {
+    const m = (item.notes||'').match(/upstream_for:(\d+)/);
+    if (m) {
+      const blockedId = parseInt(m[1]);
+      if (prereqOf[blockedId]) {
+        prereqOf[blockedId].push(item.id);
+      }
+    }
+  });
+
+  // ── Kahn's algorithm for topological sort ────────────────────────────
+  const inDegree = {};
+  const graph = {}; // id → [ids that depend on this]
+  workItems.forEach(i => { inDegree[i.id] = 0; graph[i.id] = []; });
+
+  workItems.forEach(item => {
+    (prereqOf[item.id] || []).forEach(prereqId => {
+      if (graph[prereqId]) {
+        graph[prereqId].push(item.id);
+        inDegree[item.id] = (inDegree[item.id] || 0) + 1;
+      }
+    });
+  });
+
+  const queue = workItems.filter(i => (inDegree[i.id] || 0) === 0).map(i => i.id);
+  const sorted = [];
+  const visited = new Set();
+
+  while (queue.length) {
+    const id = queue.shift();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    sorted.push(id);
+    (graph[id] || []).forEach(depId => {
+      inDegree[depId]--;
+      if (inDegree[depId] === 0) queue.push(depId);
+    });
+  }
+
+  const cycleItems = workItems.filter(i => !visited.has(i.id));
+
+  // ── Contradiction analysis ────────────────────────────────────────────
+  const contradictions = [];
+
+  // 1. Cycles
+  if (cycleItems.length) {
+    cycleItems.forEach(item => {
+      contradictions.push({
+        severity: 'error',
+        type: 'cycle',
+        message: `Cycle detected — "${item.description}" is part of a circular prerequisite chain.`,
+        itemId: item.id
+      });
+    });
+  }
+
+  // 2. Orphaned states — no work items declared
+  engDesired.forEach(state => {
+    if (!(enabledBy[state.id]?.length)) {
+      contradictions.push({
+        severity: 'warning',
+        type: 'orphaned-state',
+        message: `"${state.description}" has no work items declared that enable it.`,
+        stateId: state.id
+      });
+    }
+  });
+
+  // 3. Orphaned work items — no states enabled
+  workItems.forEach(item => {
+    if (!(itemEnables[item.id]?.length)) {
+      contradictions.push({
+        severity: 'warning',
+        type: 'orphaned-item',
+        message: `"${item.description}" does not declare any engineered states it enables.`,
+        itemId: item.id
+      });
+    }
+  });
+
+  // 4. Unreachable states — required item is in a cycle
+  const cycleIds = new Set(cycleItems.map(i => i.id));
+  engDesired.forEach(state => {
+    const required = enabledBy[state.id] || [];
+    const blocked = required.filter(id => cycleIds.has(id));
+    if (blocked.length) {
+      contradictions.push({
+        severity: 'error',
+        type: 'unreachable-state',
+        message: `"${state.description}" is unreachable — a work item that enables it is part of a cycle.`,
+        stateId: state.id
+      });
+    }
+  });
+
+  // ── Execution order with state completion markers ─────────────────────
+  const executionOrder = sorted.map(id => {
+    const item = workItems.find(i => i.id === id);
+    const enables = itemEnables[id] || [];
+    const prereqs = prereqOf[id] || [];
+    return { item, enables, prereqs };
+  });
+
+  // Add cycle items at end marked as blocked
+  cycleItems.forEach(item => {
+    executionOrder.push({ item, enables: itemEnables[item.id]||[], prereqs: prereqOf[item.id]||[], inCycle: true });
+  });
+
+  return { executionOrder, contradictions, cycleItems, enabledBy, itemEnables, sorted };
+}
+
+function setKineticTagFilter(tag) {
+  window._kineticTagFilter = tag;
+  renderStep();
+  setTimeout(renderStepButtons, 0);
+}
+
+function renderKineticAnalysis(p) {
+  const engDesired = p.cells['desired.engineer']?.queue || [];
+  const workItems  = p.cells['kinetic.engineer']?.queue  || [];
+
+  if (!workItems.length) {
+    return `<div style="color:var(--muted);font-size:13px">No work items yet. Complete Engineered States first.</div>`;
+  }
+
+  const allTags = getAllTags(p);
+  const activeTagFilter = window._kineticTagFilter || null;
+
+  // Tag filter UI
+  const tagFilterHtml = allTags.length ? `
+    <div style="margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Filter:</span>
+      <span style="font-size:11px;font-family:var(--mono);background:${!activeTagFilter?'var(--accent)':'var(--surface2)'};color:${!activeTagFilter?'#fff':'var(--muted)'};border-radius:3px;padding:2px 8px;cursor:pointer;border:1px solid ${!activeTagFilter?'var(--accent)':'var(--border)'}"
+        onclick="setKineticTagFilter(null)">All</span>
+      ${allTags.map(t => `
+        <span style="font-size:11px;font-family:var(--mono);background:${activeTagFilter===t?'rgba(168,85,247,.4)':'rgba(168,85,247,.1)'};color:#c084fc;border-radius:3px;padding:2px 8px;cursor:pointer;border:1px solid rgba(168,85,247,.3)"
+          onclick="setKineticTagFilter('${esc(t)}')">${esc(t)}</span>
+      `).join('')}
+    </div>` : '';
+
+  const { executionOrder, contradictions, cycleItems } = analyzeTopology(p);
+
+  // Apply tag filter to execution order
+  const filteredOrder = activeTagFilter
+    ? executionOrder.filter(e => !e.item || getTags(e.item).includes(activeTagFilter))
+    : executionOrder;
+
+  // ── Contradiction panel ───────────────────────────────────────────────
+  let contrHtml = '';
+  if (contradictions.length) {
+    const errors   = contradictions.filter(c => c.severity === 'error');
+    const warnings = contradictions.filter(c => c.severity === 'warning');
+
+    contrHtml = `
+      <div style="margin-bottom:24px">
+        <div style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">
+          Contradictions & Gaps — ${errors.length} error${errors.length!==1?'s':''}, ${warnings.length} warning${warnings.length!==1?'s':''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${contradictions.map(c => `
+            <div style="
+              padding:10px 14px;
+              border-radius:var(--r);
+              border:1px solid ${c.severity==='error'?'rgba(248,113,113,.3)':'rgba(251,191,36,.25)'};
+              background:${c.severity==='error'?'rgba(248,113,113,.06)':'rgba(251,191,36,.06)'};
+              font-size:12px;
+              color:${c.severity==='error'?'#f87171':'#fbbf24'};
+              display:flex;gap:10px;align-items:flex-start
+            ">
+              <span style="flex-shrink:0">${c.severity==='error'?'⛔':'⚠'}</span>
+              <span>${esc(c.message)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  } else {
+    contrHtml = `
+      <div style="margin-bottom:24px;padding:10px 14px;border-radius:var(--r);border:1px solid rgba(74,222,128,.25);background:rgba(74,222,128,.06);font-size:12px;color:#4ade80">
+        ✓ No contradictions detected — prerequisite chain is consistent.
+      </div>`;
+  }
+
+  // ── Execution order ───────────────────────────────────────────────────
+  const orderHtml = `
+    <div>
+      <div style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">
+        Derived Execution Order
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${filteredOrder.map((entry, idx) => {
+          const { item, enables, prereqs, inCycle } = entry;
+          if (!item) return '';
+          const enablesLabels = enables.map(sid => {
+            const si = engDesired.findIndex(s => s.id === sid);
+            return si >= 0 ? `<span style="font-size:10px;background:rgba(74,222,128,.12);color:#4ade80;border-radius:3px;padding:1px 5px">enables #${si+1}</span>` : '';
+          }).join(' ');
+          const statusColor = {pending:'var(--muted)',active:'#fbbf24',closed:'#4ade80',deferred:'var(--muted)',blocked:'#f87171'}[item.status]||'var(--muted)';
+          return `
+            <div style="
+              display:flex;gap:10px;align-items:flex-start;
+              padding:8px 12px;
+              border-radius:var(--r);
+              background:${inCycle?'rgba(248,113,113,.06)':'var(--surface)'};
+              border:1px solid ${inCycle?'rgba(248,113,113,.3)':'var(--border)'};
+              opacity:${item.status==='closed'?.6:1}
+            ">
+              <span style="font-family:var(--mono);font-size:11px;color:var(--muted);min-width:24px;padding-top:1px">${idx+1}</span>
+              <div style="flex:1">
+                <div style="font-size:12px;color:${item.status==='closed'?'#4ade80':'var(--text)'}">
+                  ${item.status==='closed'?'✓ ':''} ${esc(item.description||'')}
+                  ${inCycle?'<span style="font-size:10px;color:#f87171;margin-left:6px">⛔ in cycle</span>':''}
+                </div>
+                ${enablesLabels ? `<div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">${enablesLabels}</div>` : ''}
+              </div>
+              <span style="font-size:10px;font-family:var(--mono);color:${statusColor}">${item.status}</span>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  // ── State completion summary ──────────────────────────────────────────
+  const { enabledBy } = analyzeTopology(p);
+  const stateHtml = `
+    <div style="margin-top:24px">
+      <div style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">
+        State Completion
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${engDesired.map((state, idx) => {
+          const required = enabledBy[state.id] || [];
+          const closed   = required.filter(id => workItems.find(i=>i.id===id&&i.status==='closed')).length;
+          const total    = required.length;
+          const pct      = total ? Math.round((closed/total)*100) : 0;
+          const complete = total > 0 && closed === total;
+          return `
+            <div style="
+              padding:8px 12px;border-radius:var(--r);
+              background:${complete?'rgba(74,222,128,.06)':'var(--surface)'};
+              border:1px solid ${complete?'rgba(74,222,128,.25)':total===0?'rgba(251,191,36,.25)':'var(--border)'};
+            ">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${total?4:0}px">
+                <span style="font-size:12px;color:${complete?'#4ade80':'var(--text)'}">${complete?'✓ ':''}${idx+1}. ${esc(state.description||'')}</span>
+                <span style="font-size:10px;font-family:var(--mono);color:${total===0?'#fbbf24':complete?'#4ade80':'var(--muted)'}">
+                  ${total===0?'⚠ no work items':`${closed}/${total} closed`}
+                </span>
+              </div>
+              ${total > 0 ? `<div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${complete?'#4ade80':'var(--accent)'};border-radius:2px;transition:width .3s"></div>
+              </div>` : ''}
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  const exportHtml = `
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Export procedure:</span>
+      <button class="btn-ghost btn-sm" onclick="exportProcedure(null)">All items</button>
+      ${allTags.map(t => `<button class="btn-ghost btn-sm" onclick="exportProcedure('${esc(t)}')">${esc(t)}</button>`).join('')}
+    </div>`;
+  return tagFilterHtml + contrHtml + orderHtml + stateHtml + exportHtml;
+}
+
+// ── Actions ────────────────────────────────────────────────────────────────
+
+async function saveField(action, role, field) {
+  const inputId = role === null ? null :
+    (field === 'story' && action === 'kinetic') ? `kinetic-${role}` : 'field-input';
+
+  // For kinetic step, find the right textarea
+  let val;
+  if (action === 'kinetic') {
+    const el = document.getElementById(`kinetic-${role}`);
+    val = el ? el.value.trim() : '';
+  } else {
+    const el = document.getElementById('field-input');
+    val = el ? el.value.trim() : '';
+  }
+
+  const body = {};
+  body[field] = val;
+
+  await api('PATCH', `/api/projects/${state.current.id}/cells/${action}/${role}`, body);
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+}
+
+
+async function promoteAndSplit(id) {
+  const item = state.current.cells['kinetic.engineer']?.queue?.find(i => i.id === id);
+  if (!item) return;
+
+  // Move item to engineer desired states
+  await api('POST', `/api/projects/${state.current.id}/cells/desired/engineer/queue`, {
+    description: item.description,
+    status: 'pending',
+    notes: 'promoted'
+  });
+
+  // Remove from yield queue — item is gone after this, no edit modal to restore
+  await api('DELETE', `/api/queue/${id}`);
+
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+
+  // Get the newly created desired state
+  const engDesired = state.current.cells['desired.engineer']?.queue || [];
+  const promoted = engDesired[engDesired.length - 1];
+
+  closeModal();
+  openSplitModal(promoted);
+}
+
+function openSplitModal(desiredState) {
+  openModal(`
+    <h3>Split into Work Items</h3>
+    <div style="background:rgba(91,141,238,.08);border:1px solid rgba(91,141,238,.2);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#7bb3e0">
+      <strong>Promoted:</strong> ${esc(desiredState.description||'')}
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+      Now enumerate the child conditions — the ordered sequence of states that must be true for the desired state above to be achieved. One condition per entry, states not work.
+    </div>
+    <div id="split-items" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
+    <div class="field">
+      <label>Add condition</label>
+      <input type="text" id="split-input"
+        placeholder="Prerequisite condition — must be true before the blocked item..."
+        onkeydown="if(event.key==='Enter'){event.preventDefault();addSplitItem();}">
+    </div>
+    <div class="resolution-hint" style="margin-bottom:16px">
+      <span class="good">✓ State:</span> "[X] is [condition]" &nbsp;
+      <span class="bad">✗ Work:</span> "Do X" or "Write Y"
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="commitSplit(${desiredState.id})">Add to queue</button>
+      <button class="btn-ghost" onclick="closeModal();renderProject();">Done</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('split-input')?.focus(), 50);
+  window._splitItems = [];
+}
+
+
+function addUpstreamDep(id) {
+  const item = state.current.cells['kinetic.engineer']?.queue?.find(i => i.id === id);
+  if (!item) return;
+
+  // Capture current edit state from modal fields before swapping
+  window._savedEditState = {
+    id,
+    desc:   document.getElementById('edit-desc')?.value   ?? item.description ?? '',
+    ac:     document.getElementById('edit-ac')?.value     ?? '',
+    status: document.getElementById('edit-status')?.value ?? item.status ?? 'pending',
+    notes:  document.getElementById('edit-notes')?.value  ?? '',
+  };
+
+  window._upstreamItems = [];
+
+  openModal(`
+    <h3>Add Prerequisite Work Items</h3>
+    <div style="background:rgba(91,141,238,.08);border:1px solid rgba(91,141,238,.2);border-radius:var(--r);padding:10px 14px;margin-bottom:16px;font-size:12px;color:#7bb3e0">
+      <strong>Blocked item:</strong> ${esc(item.description||'')}
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+      Enumerate the prerequisite conditions — work items that must be true <em>before</em> the blocked item can proceed.
+      They will be inserted immediately before it in the queue, in the order you add them.
+    </div>
+    <div id="upstream-items" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
+    <div class="field">
+      <label>Add prerequisite</label>
+      <input type="text" id="upstream-input"
+        placeholder="Prerequisite condition — must be true before the blocked item..."
+        onkeydown="if(event.key==='Enter'){event.preventDefault();addUpstreamItem();}">
+    </div>
+    <div class="resolution-hint" style="margin-bottom:12px">
+      <span class="good">✓ State:</span> "[X] is [condition]" &nbsp;
+      <span class="bad">✗ Work:</span> "Build X" or "Create Y"
+    </div>
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="upstream-promote" style="accent-color:var(--accent)">
+        <span style="color:var(--text)">Also add these to Engineer Desired States</span>
+      </label>
+    </div>
+    <div class="btn-row mt16">
+      <button class="btn-primary" onclick="commitUpstreamDep(${id})">Insert before blocked item</button>
+      <button class="btn-ghost" onclick="restoreEditModal()">Cancel</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('upstream-input')?.focus(), 50);
+}
+
+function addUpstreamItem() {
+  const input = document.getElementById('upstream-input');
+  const val = input?.value?.trim();
+  if (!val) return;
+  window._upstreamItems = window._upstreamItems || [];
+  window._upstreamItems.push(val);
+  input.value = '';
+
+  const container = document.getElementById('upstream-items');
+  const div = document.createElement('div');
+  div.className = 'queue-item';
+  div.style.borderLeft = '3px solid #7bb3e0';
+  div.innerHTML = `
+    <div class="queue-num">${window._upstreamItems.length}</div>
+    <div class="queue-content"><div class="queue-desc">${esc(val)}</div></div>`;
+  container.appendChild(div);
+  input.focus();
+}
+
+function restoreEditModal() {
+  const saved = window._savedEditState;
+  closeModal();
+  if (saved?.id) {
+    setTimeout(() => {
+      editQueueItem(saved.id, {
+        desc: saved.desc, ac: saved.ac,
+        status: saved.status, notes: saved.notes
+      });
+      window._savedEditState = null;
+    }, 50);
+  }
+}
+
+async function commitUpstreamDep(blockedId) {
+  const items = window._upstreamItems || [];
+  if (!items.length) { restoreEditModal(); return; }
+  const promote = document.getElementById('upstream-promote')?.checked;
+
+  const blocked = state.current.cells['kinetic.engineer']?.queue?.find(i => i.id === blockedId);
+  if (!blocked) return;
+
+  // Insert each upstream item before the blocked item
+  for (const desc of items) {
+    const newItem = await api('POST', `/api/projects/${state.current.id}/cells/kinetic/engineer/queue`, {
+      description: desc,
+      status: 'pending',
+      notes: `upstream_for:${blockedId}`
+    });
+    if (promote) {
+      await api('POST', `/api/projects/${state.current.id}/cells/desired/engineer/queue`, {
+        description: desc, status: 'pending', notes: 'promoted_upstream'
+      });
+    }
+  }
+
+  // Tag the blocked item
+  await api('PATCH', `/api/queue/${blockedId}`, {
+    description: blocked.description,
+    status: blocked.status,
+    notes: ((blocked.notes||'') + ` has_upstream:${items.length}`).trim()
+  });
+
+  window._upstreamItems = [];
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  closeModal();
+  renderProject();
+
+  // Restore the edit modal with preserved state
+  const saved = window._savedEditState;
+  if (saved?.id) {
+    setTimeout(() => {
+      editQueueItem(saved.id, {
+        desc: saved.desc, ac: saved.ac,
+        status: saved.status, notes: saved.notes
+      });
+      window._savedEditState = null;
+    }, 100);
+  }
+}
+
+function addSplitItem() {
+  const input = document.getElementById('split-input');
+  const val = input?.value?.trim();
+  if (!val) return;
+  window._splitItems = window._splitItems || [];
+  window._splitItems.push(val);
+  input.value = '';
+
+  const container = document.getElementById('split-items');
+  const div = document.createElement('div');
+  div.className = 'queue-item';
+  div.style.borderLeft = '3px solid var(--eng)';
+  div.innerHTML = `
+    <div class="queue-num">${window._splitItems.length}</div>
+    <div class="queue-content"><div class="queue-desc">${esc(val)}</div></div>`;
+  container.appendChild(div);
+  input.focus();
+}
+
+async function commitSplit(desiredStateId) {
+  const items = window._splitItems || [];
+  if (!items.length) { closeModal(); return; }
+
+  for (const desc of items) {
+    await api('POST', `/api/projects/${state.current.id}/cells/kinetic/engineer/queue`, {
+      description: desc,
+      status: 'pending',
+      notes: `split_from:${desiredStateId}`
+    });
+  }
+
+  window._splitItems = [];
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  closeModal();
+  renderProject();
+}
+
+async function addQueueItem() {
+  const desc  = document.getElementById('qi-desc')?.value?.trim();
+  const notes = document.getElementById('qi-notes')?.value?.trim();
+  if (!desc) return;
+  await api('POST', `/api/projects/${state.current.id}/cells/kinetic/engineer/queue`, {
+    description: desc, notes, status: 'pending'
+  });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+  setTimeout(applyDepHighlight, 50);
+}
+
+function editQueueItem(id, prefill) {
+  const item = state.current.cells['kinetic.engineer']?.queue?.find(i => i.id === id);
+  if (!item) return;
+  // Use prefill values if provided (restoring state after upstream dep workflow)
+  const pDesc   = prefill?.desc   ?? item.description ?? '';
+  const pAC     = prefill?.ac     ?? ((item.notes||'').match(/ac:([^|]+)/)?.[1]?.trim() ?? '');
+  const pStatus = prefill?.status ?? item.status ?? 'pending';
+  const pNotes  = prefill?.notes  ?? ((item.notes||'').replace(/ac:[^|]+/g,'').replace(/covers:[\d,]+/g,'').replace(/split_from:\d+/g,'').replace(/upstream_for:\d+/g,'').replace(/depends_on:\d+/g,'').replace(/order_num:\d+/g,'').replace(/declared:[\d,]+/g,'').replace(/has_upstream:\d+/g,'').replace(/promoted[_a-z]*/g,'').replace(/upstream_for:\d+/g,'').replace(/tags:[^|\n]+/g,'').replace(/\|/g,'').trim() ?? '');
+  const existingTags = getTags(item).join(', ');
+  const engDesired = state.current.cells['desired.engineer']?.queue || [];
+  // Parse existing coverage from notes
+  const coverageMatch = (item.notes||'').match(/covers:([\d,]+)/);
+  const covered = coverageMatch ? coverageMatch[1].split(',').map(Number) : [];
+
+  // Parse declared dependencies
+  const declaredMatch = (item.notes||'').match(/declared:([\d,]+)/);
+  const declaredDeps  = declaredMatch ? declaredMatch[1].split(',').map(Number) : [];
+
+  const depSelectorHtml = engDesired.length ? `
+    <div class="field">
+      <label>Enables engineered states</label>
+      <select id="dep-select" multiple onchange="previewDepHighlight(this)"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;padding:4px;outline:none;min-height:80px;max-height:120px">
+        ${engDesired.map((ds, i) =>
+          `<option value="${ds.id}" ${declaredDeps.includes(ds.id)?'selected':''}>${i+1}. ${esc(ds.description||'')}</option>`
+        ).join('')}
+      </select>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Hold Cmd/Ctrl to select multiple — selection previews highlights</div>
+    </div>` : '';
+
+  const coverageHtml = engDesired.length ? `
+    <div class="field">
+      <label>Enables engineered states (confirm at closure)</label>
+      <select id="coverage-select" multiple
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;padding:4px;outline:none;min-height:80px;max-height:120px">
+        ${engDesired.map((ds, i) =>
+          `<option value="${ds.id}" ${covered.includes(ds.id)?'selected':''}>${i+1}. ${esc(ds.description||'')}</option>`
+        ).join('')}
+      </select>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Hold Cmd/Ctrl to select multiple — selection previews highlights</div>
+    </div>` : '';
+
+  // Parse existing prerequisites (items that have upstream_for pointing to this item)
+  const existingPrereqIds = (state.current.cells['kinetic.engineer']?.queue||[])
+    .filter(wi => (wi.notes||'').includes(`upstream_for:${id}`))
+    .map(wi => wi.id);
+
+  // Other work items that could be prerequisites (not self)
+  const otherItems = (state.current.cells['kinetic.engineer']?.queue||[]).filter(wi => wi.id !== id);
+
+  const prereqSelectorHtml = otherItems.length ? `
+    <div class="field">
+      <label>Prerequisites (work items that must be true first)</label>
+      <select id="prereq-select" multiple onchange="previewPrereqHighlight(this,${id})"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:var(--sans);font-size:12px;padding:4px;outline:none;min-height:80px;max-height:120px">
+        ${otherItems.map((wi, i) =>
+          `<option value="${wi.id}" ${existingPrereqIds.includes(wi.id)?'selected':''}>${wi.order_num}. ${esc((wi.description||'').slice(0,60))}${(wi.description||'').length>60?'…':''}</option>`
+        ).join('')}
+      </select>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Hold Cmd/Ctrl to select multiple</div>
+    </div>` : '';
+
+  // Parse existing acceptance criterion from notes
+  const acMatch = (item.notes||'').match(/ac:([^|]+)/);
+  const existingAC = acMatch ? acMatch[1].trim() : '';
+
+  openModal(`
+    <h3>Edit Work Item</h3>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="edit-desc" rows="3">${esc(pDesc)}</textarea>
+    </div>
+    ${depSelectorHtml}
+    ${prereqSelectorHtml}
+    <div class="field">
+      <label>Acceptance Criterion</label>
+      <textarea id="edit-ac" rows="3" placeholder="How do you verify this state is true? One observable check.">${esc(pAC)}</textarea>
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="edit-status" onchange="onStatusChange(this)">
+        ${['pending','active','closed','deferred','blocked'].map(s =>
+          `<option value="${s}" ${pStatus===s?'selected':''}>${s}</option>`
+        ).join('')}
+      </select>
+    </div>
+    <div id="coverage-section" style="${item.status==='closed'?'':'display:none'}">
+      ${coverageHtml}
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <input type="text" id="edit-notes" value="${esc(pNotes)}">
+    </div>
+    <div class="field">
+      <label>Tags (comma-separated)</label>
+      <input type="text" id="edit-tags" value="${esc(existingTags)}"
+        placeholder="e.g. day-1, user-management, dns">
+      ${getAllTags(state.current).length ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+        ${getAllTags(state.current).map(t => `<span style="font-size:10px;font-family:var(--mono);background:rgba(168,85,247,.1);color:#c084fc;border-radius:3px;padding:1px 6px;cursor:pointer;border:1px solid rgba(168,85,247,.2)" onclick="addTagToInput('${esc(t)}')">${esc(t)}</span>`).join('')}
+      </div>` : ''}
+    </div>
+    <div style="padding-top:16px;margin-top:8px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.7">
+        <strong style="color:var(--warn)">Does this item need restructuring?</strong>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="background:rgba(200,121,65,.06);border:1px solid rgba(200,121,65,.2);border-radius:var(--r);padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <button class="btn-ghost btn-sm" style="border-color:rgba(200,121,65,.4);color:var(--warn);white-space:nowrap"
+              onclick="promoteAndSplit(${id})">⬆ Promote &amp; Split</button>
+            <span style="font-size:11px;font-family:var(--mono);color:var(--warn)">wrong level</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.7">
+            <strong style="color:var(--text)">Signal:</strong> you cannot write a single acceptance criterion because this item is actually a category of work, not a condition.
+            It belongs in Engineer Desired States. Move it up and enumerate its children as work items.
+          </div>
+        </div>
+        <div style="background:rgba(91,141,238,.06);border:1px solid rgba(91,141,238,.2);border-radius:var(--r);padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+            <button class="btn-ghost btn-sm" style="border-color:rgba(91,141,238,.4);color:#7bb3e0;white-space:nowrap"
+              onclick="addUpstreamDep(${id})">⬅ Add prerequisite</button>
+            <span style="font-size:11px;font-family:var(--mono);color:#7bb3e0">missing prerequisite</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.7">
+            <strong style="color:var(--text)">Signal:</strong> writing the acceptance criterion revealed a prerequisite — something this item <em>requires</em> that isn't in the queue yet.
+            This item stays. The prerequisite gets inserted before it.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row mt16">
+      <button class="btn-primary" onclick="saveQueueItem(${id})">Save</button>
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+}
+
+function onStatusChange(el) {
+  const section = document.getElementById('coverage-section');
+  if (section) section.style.display = el.value === 'closed' ? '' : 'none';
+}
+
+async function saveQueueItem(id) {
+  const description = document.getElementById('edit-desc').value.trim();
+  const status      = document.getElementById('edit-status').value;
+  let notes         = document.getElementById('edit-notes').value.trim();
+
+  // Collect declared dependencies from multi-select
+  const depSelect = document.getElementById('dep-select');
+  notes = notes.replace(/declared:[\d,]+/g, '').trim();
+  if (depSelect) {
+    const depIds = Array.from(depSelect.selectedOptions).map(o => o.value).join(',');
+    if (depIds) notes = notes ? `${notes} declared:${depIds}` : `declared:${depIds}`;
+  }
+
+  // Save prerequisite relationships
+  // Remove existing upstream_for tags pointing to this item from other items
+  const prereqSelect = document.getElementById('prereq-select');
+  if (prereqSelect) {
+    const selectedPrereqIds = Array.from(prereqSelect.selectedOptions).map(o => parseInt(o.value));
+    const allItems = state.current.cells['kinetic.engineer']?.queue || [];
+
+    // For each item that was a prereq and is no longer selected, remove upstream_for tag
+    const prevPrereqItems = allItems.filter(wi => (wi.notes||'').includes(`upstream_for:${id}`));
+    for (const wi of prevPrereqItems) {
+      if (!selectedPrereqIds.includes(wi.id)) {
+        const cleanNotes = (wi.notes||'').replace(new RegExp(`upstream_for:${id}`, 'g'), '').trim();
+        await api('PATCH', `/api/queue/${wi.id}`, {
+          description: wi.description, status: wi.status, notes: cleanNotes
+        });
+      }
+    }
+
+    // For each newly selected prereq, add upstream_for tag
+    for (const prereqId of selectedPrereqIds) {
+      const wi = allItems.find(w => w.id === prereqId);
+      if (wi && !(wi.notes||'').includes(`upstream_for:${id}`)) {
+        const newNotes = (wi.notes||'').trim()
+          ? `${wi.notes} upstream_for:${id}`
+          : `upstream_for:${id}`;
+        await api('PATCH', `/api/queue/${wi.id}`, {
+          description: wi.description, status: wi.status, notes: newNotes
+        });
+      }
+    }
+  }
+
+  // Collect acceptance criterion
+  const ac = document.getElementById('edit-ac')?.value?.trim() || '';
+  notes = notes.replace(/ac:[^|]+/g, '').trim();
+  if (ac) notes = notes ? `${notes} | ac:${ac}` : `ac:${ac}`;
+
+  // Collect coverage from multi-select
+  const coverSel = document.getElementById('coverage-select');
+  notes = notes.replace(/covers:[\d,]+/g, '').trim();
+  if (coverSel) {
+    const ids = Array.from(coverSel.selectedOptions).map(o => o.value).join(',');
+    if (ids) notes = notes ? `${notes} covers:${ids}` : `covers:${ids}`;
+  }
+
+  // Save tags
+  const tagsInput = document.getElementById('edit-tags')?.value?.trim() || '';
+  notes = notes.replace(/tags:[^|\n]+/g, '').trim();
+  if (tagsInput) {
+    const cleanTags = tagsInput.split(',').map(t => t.trim()).filter(Boolean).join(',');
+    if (cleanTags) notes = notes ? `${notes} | tags:${cleanTags}` : `tags:${cleanTags}`;
+  }
+
+  await api('PATCH', `/api/queue/${id}`, { description, status, notes });
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  closeModal();
+  renderProject();
+  setTimeout(applyDepHighlight, 50);
+}
+
+async function deleteQueueItem(id) {
+  if (!confirm('Remove this work item?')) return;
+  await api('DELETE', `/api/queue/${id}`);
+  state.current = await api('GET', `/api/projects/${state.current.id}`);
+  renderProject();
+}
+
+// ── Projects ───────────────────────────────────────────────────────────────
+
+function openNewProject() {
+  openModal(`
+    <h3>New Project</h3>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="new-name" placeholder="e.g. NHK M365 Migration">
+    </div>
+    <div class="field">
+      <label>Description (optional)</label>
+      <textarea id="new-desc" rows="2" placeholder="Brief context..."></textarea>
+    </div>
+    <div class="btn-row mt16">
+      <button class="btn-primary" onclick="createProject()">Create</button>
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('new-name')?.focus(), 50);
+}
+
+async function createProject() {
+  const name = document.getElementById('new-name')?.value?.trim();
+  const description = document.getElementById('new-desc')?.value?.trim();
+  if (!name) return;
+  const p = await api('POST', '/api/projects', { name, description });
+  state.projects = await api('GET', '/api/projects');
+  state.current = p;
+  state.step = 0;
+  closeModal();
+  renderSidebar();
+  renderProject();
+}
+
+async function deleteProject() {
+  if (!state.current) return;
+  if (!confirm(`Delete "${state.current.name}"? This cannot be undone.`)) return;
+  await api('DELETE', `/api/projects/${state.current.id}`);
+  state.projects = await api('GET', '/api/projects');
+  state.current = null;
+  renderSidebar();
+  document.getElementById('view-empty').classList.remove('hidden');
+  document.getElementById('view-project').classList.add('hidden');
+  document.getElementById('export-bar').style.display = 'none';
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────
+
+async function exportJSON() {
+  if (!state.current) return;
+  const data = await api('GET', `/api/projects/${state.current.id}/export/json`);
+  download(JSON.stringify(data, null, 2), `krm-${slug(state.current.name)}.json`, 'application/json');
+}
+
+async function exportMarkdown() {
+  if (!state.current) return;
+  const r = await fetch(`/api/projects/${state.current.id}/export/markdown`);
+  const text = await r.text();
+  download(text, `krm-${slug(state.current.name)}.md`, 'text/markdown');
+}
+
+function download(content, filename, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = filename;
+  a.click();
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+
+function openModal(html) {
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+}
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function slug(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+}
+
+document.getElementById('ver').textContent = VERSION;
+init();
+</script>
+</body>
+</html>
