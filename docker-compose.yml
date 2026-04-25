@@ -1,0 +1,11 @@
+services:
+  krm:
+    build: .
+    ports:
+      - "8100:8000"
+    volumes:
+      - krm-data:/data
+    restart: unless-stopped
+
+volumes:
+  krm-data:
