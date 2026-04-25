@@ -80,6 +80,11 @@ class QueueItemIn(BaseModel):
     status: Optional[str] = "pending"
     notes: Optional[str] = None
 
+class ProjectImport(BaseModel):
+    name: str
+    description: Optional[str] = None
+    cells: dict
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 STATES = ["current", "kinetic", "desired"]
@@ -144,6 +149,90 @@ def create_project(body: ProjectIn):
     result = project_to_dict(conn, pid)
     conn.close()
     return result
+
+@app.post("/api/projects/import", status_code=201)
+def import_project(body: ProjectImport):
+    """Import a project from a JSON snapshot (as produced by /export/json)."""
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO projects (name, description) VALUES (?,?)",
+        (body.name, body.description)
+    )
+    conn.commit()
+    pid = cur.lastrowid
+    ensure_cells(conn, pid)
+
+    # Build a map of new cell ids keyed by state.role
+    cells_raw = conn.execute("SELECT * FROM cells WHERE project_id=?", (pid,)).fetchall()
+    cell_map = {f"{c['state']}.{c['role']}": c['id'] for c in cells_raw}
+
+    # old queue item id -> new queue item id (needed to remap notes references)
+    id_remap = {}
+
+    for key, cell_data in body.cells.items():
+        cell_id = cell_map.get(key)
+        if not cell_id:
+            continue
+
+        # Update story / scope_gate
+        story = cell_data.get("story")
+        scope_gate = cell_data.get("scope_gate")
+        if story or scope_gate:
+            conn.execute(
+                "UPDATE cells SET story=?, scope_gate=? WHERE id=?",
+                (story, scope_gate, cell_id)
+            )
+
+        # Insert queue items preserving order_num
+        for item in cell_data.get("queue", []):
+            cur2 = conn.execute(
+                "INSERT INTO queue_items (cell_id, order_num, description, status, notes) VALUES (?,?,?,?,?)",
+                (cell_id, item.get("order_num", 1), item.get("description"), item.get("status", "pending"), item.get("notes"))
+            )
+            conn.commit()
+            id_remap[item["id"]] = cur2.lastrowid
+
+    # Remap all old IDs in notes fields to new IDs
+    # Affected tags: upstream_for:<id>, declared:<ids>, covers:<ids>, split_from:<id>
+    all_items = conn.execute(
+        "SELECT qi.id, qi.notes FROM queue_items qi "
+        "JOIN cells c ON qi.cell_id = c.id WHERE c.project_id=?", (pid,)
+    ).fetchall()
+
+    for item in all_items:
+        notes = item["notes"]
+        if not notes:
+            continue
+        new_notes = remap_notes_ids(notes, id_remap)
+        if new_notes != notes:
+            conn.execute("UPDATE queue_items SET notes=? WHERE id=?", (new_notes, item["id"]))
+
+    conn.commit()
+    result = project_to_dict(conn, pid)
+    conn.close()
+    return result
+
+def remap_notes_ids(notes: str, id_remap: dict) -> str:
+    """Replace old queue item IDs in notes field tags with new IDs."""
+    import re
+
+    def remap_id(old_id_str):
+        old_id = int(old_id_str)
+        return str(id_remap.get(old_id, old_id))
+
+    def remap_id_list(old_ids_str):
+        return ",".join(remap_id(i) for i in old_ids_str.split(",") if i.strip())
+
+    # upstream_for:<single_id>
+    notes = re.sub(r'upstream_for:(\d+)', lambda m: f'upstream_for:{remap_id(m.group(1))}', notes)
+    # split_from:<single_id>
+    notes = re.sub(r'split_from:(\d+)', lambda m: f'split_from:{remap_id(m.group(1))}', notes)
+    # declared:<id_list>
+    notes = re.sub(r'declared:([\d,]+)', lambda m: f'declared:{remap_id_list(m.group(1))}', notes)
+    # covers:<id_list>
+    notes = re.sub(r'covers:([\d,]+)', lambda m: f'covers:{remap_id_list(m.group(1))}', notes)
+
+    return notes
 
 @app.get("/api/projects/{pid}")
 def get_project(pid: int):
