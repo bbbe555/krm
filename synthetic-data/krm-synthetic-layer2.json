@@ -1,0 +1,200 @@
+{
+  "name": "Internal Tool Launch \u2014 Layer 2: First Revelation",
+  "description": "Synthetic dataset layer 2. Revelation: SSO integration is required before accounts can be provisioned. Cascades to a new engineered state (ES4) and two new work items inserted as prerequisites before W6.",
+  "cells": {
+    "desired.stakeholder": {
+      "state": "desired",
+      "role": "stakeholder",
+      "story": "The operations team manages all active projects through the new tool with no reliance on spreadsheets.",
+      "scope_gate": null,
+      "queue": []
+    },
+    "current.stakeholder": {
+      "state": "current",
+      "role": "stakeholder",
+      "story": "Project tracking is split across four shared spreadsheets maintained manually by three coordinators.",
+      "scope_gate": null,
+      "queue": []
+    },
+    "kinetic.stakeholder": {
+      "state": "kinetic",
+      "role": "stakeholder",
+      "story": "The platform team is deploying the new tool and migrating existing project data while coordinators run parallel processes. An SSO integration requirement has been identified that must be resolved before user accounts can be activated.",
+      "scope_gate": null,
+      "queue": []
+    },
+    "desired.user": {
+      "state": "desired",
+      "role": "user",
+      "story": null,
+      "scope_gate": null,
+      "queue": [
+        {
+          "id": 101,
+          "order_num": 1,
+          "description": "Project managers can create and update project records without spreadsheet access.",
+          "status": "pending",
+          "notes": ""
+        },
+        {
+          "id": 102,
+          "order_num": 2,
+          "description": "Project managers can view the full history of changes to any project record.",
+          "status": "pending",
+          "notes": ""
+        },
+        {
+          "id": 103,
+          "order_num": 3,
+          "description": "Project managers receive notifications when a project they own changes status.",
+          "status": "pending",
+          "notes": ""
+        }
+      ]
+    },
+    "current.user": {
+      "state": "current",
+      "role": "user",
+      "story": null,
+      "scope_gate": null,
+      "queue": [
+        {
+          "id": 104,
+          "order_num": 1,
+          "description": "Project managers update project status by editing a shared Google Sheet.",
+          "status": "pending",
+          "notes": ""
+        },
+        {
+          "id": 105,
+          "order_num": 2,
+          "description": "Project managers track history by scrolling through sheet revision history.",
+          "status": "pending",
+          "notes": ""
+        },
+        {
+          "id": 106,
+          "order_num": 3,
+          "description": "Project managers learn of status changes through a weekly email digest.",
+          "status": "pending",
+          "notes": ""
+        }
+      ]
+    },
+    "kinetic.user": {
+      "state": "kinetic",
+      "role": "user",
+      "story": null,
+      "scope_gate": null,
+      "queue": [
+        {
+          "id": 107,
+          "order_num": 1,
+          "description": "Project managers are running the new tool in parallel with the existing spreadsheets.",
+          "status": "pending",
+          "notes": ""
+        }
+      ]
+    },
+    "desired.engineer": {
+      "state": "desired",
+      "role": "engineer",
+      "story": null,
+      "scope_gate": null,
+      "queue": [
+        {
+          "id": 201,
+          "order_num": 1,
+          "description": "The production environment is provisioned and passing all health checks.",
+          "status": "pending",
+          "notes": ""
+        },
+        {
+          "id": 202,
+          "order_num": 2,
+          "description": "All existing project data is migrated and verified in the new system.",
+          "status": "pending",
+          "notes": ""
+        },
+        {
+          "id": 203,
+          "order_num": 3,
+          "description": "User accounts are provisioned and role assignments are confirmed for all project managers.",
+          "status": "pending",
+          "notes": ""
+        },
+        {
+          "id": 204,
+          "order_num": 4,
+          "description": "SSO integration with the company identity provider is complete and verified.",
+          "status": "pending",
+          "notes": ""
+        }
+      ]
+    },
+    "kinetic.engineer": {
+      "state": "kinetic",
+      "role": "engineer",
+      "story": null,
+      "scope_gate": null,
+      "queue": [
+        {
+          "id": 301,
+          "order_num": 1,
+          "description": "Infrastructure is provisioned in the production environment.",
+          "status": "pending",
+          "notes": "declared:201 upstream_for:302 | ac:Terraform apply exits 0 and all health check endpoints return 200. | tags:infra"
+        },
+        {
+          "id": 302,
+          "order_num": 2,
+          "description": "The application is deployed to production.",
+          "status": "pending",
+          "notes": "declared:201 upstream_for:303 | ac:Application version matches release tag and /health returns ok. | tags:infra"
+        },
+        {
+          "id": 303,
+          "order_num": 3,
+          "description": "Production smoke tests are passing.",
+          "status": "pending",
+          "notes": "declared:201 upstream_for:306 | ac:All 12 smoke test cases pass in the production environment. | tags:infra"
+        },
+        {
+          "id": 304,
+          "order_num": 4,
+          "description": "Existing project data is exported from Google Sheets in the canonical format.",
+          "status": "pending",
+          "notes": "declared:202 upstream_for:305 | ac:Export file contains all 847 records, zero validation errors. | tags:migration"
+        },
+        {
+          "id": 305,
+          "order_num": 5,
+          "description": "Migrated project data is verified in the new system.",
+          "status": "pending",
+          "notes": "declared:202 upstream_for:306 | ac:Record count matches export, spot-check of 20 records confirms field accuracy. | tags:migration"
+        },
+        {
+          "id": 306,
+          "order_num": 6,
+          "description": "User accounts are provisioned and role assignments confirmed.",
+          "status": "pending",
+          "notes": "declared:203 upstream_for:308 | ac:All 23 project managers can log in via SSO and see their assigned projects. | tags:accounts"
+        },
+        {
+          "id": 307,
+          "order_num": 7,
+          "description": "SSO is configured in the identity provider for the new tool.",
+          "status": "pending",
+          "notes": "declared:204 upstream_for:308 | ac:SAML app is active in Okta with correct ACS URL and entity ID. | tags:sso"
+        },
+        {
+          "id": 308,
+          "order_num": 8,
+          "description": "SSO login is verified end-to-end for a test account.",
+          "status": "pending",
+          "notes": "declared:204 upstream_for:306 | ac:Test account completes SSO flow without error and lands on the dashboard. | tags:sso"
+        }
+      ]
+    }
+  }
+}
