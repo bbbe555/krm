@@ -3099,6 +3099,38 @@ async function deleteProject() {
 
 // ── Export ─────────────────────────────────────────────────────────────────
 
+async function importJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch(e) {
+    alert('Invalid JSON file.');
+    return;
+  }
+  if (!data.name || !data.cells) {
+    alert('This does not look like a KRM export file.');
+    return;
+  }
+  try {
+    const project = await api('POST', '/api/projects/import', {
+      name: data.name,
+      description: data.description || null,
+      cells: data.cells
+    });
+    state.projects = await api('GET', '/api/projects');
+    state.current = project;
+    state.step = 0;
+    state.tab = null;
+    renderSidebar();
+    renderProject();
+  } catch(e) {
+    alert('Import failed: ' + e.message);
+  }
+}
+
 async function exportJSON() {
   if (!state.current) return;
   const data = await api('GET', `/api/projects/${state.current.id}/export/json`);
