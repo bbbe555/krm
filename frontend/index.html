@@ -602,6 +602,8 @@
       <div class="sidebar-header">
         <span class="sidebar-title">Projects</span>
         <button class="btn-ghost btn-sm" onclick="openNewProject()">+ New</button>
+        <button class="btn-ghost btn-sm" onclick="document.getElementById('import-file-input').click()">↑ Import</button>
+        <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importJSON(this)">
       </div>
       <div id="project-list"></div>
     </div>
@@ -613,6 +615,7 @@
         <h2>No project selected</h2>
         <p>Create a new project to begin working through the Kinetic Requirements Model procedure.</p>
         <button class="btn-primary" onclick="openNewProject()">Create project</button>
+        <button class="btn-ghost" onclick="document.getElementById('import-file-input').click()">Import JSON</button>
       </div>
       <div id="view-project" class="hidden"></div>
     </div>
@@ -1405,12 +1408,44 @@ function renderTestPlanStep(p, s) {
 }
 
 
+async function importJSON(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch(e) {
+    alert('Invalid JSON file.');
+    return;
+  }
+  if (!data.name || !data.cells) {
+    alert('This does not look like a KRM export file.');
+    return;
+  }
+  try {
+    const project = await api('POST', '/api/projects/import', {
+      name: data.name,
+      description: data.description || null,
+      cells: data.cells
+    });
+    state.projects = await api('GET', '/api/projects');
+    state.current = project;
+    state.step = 0;
+    state.tab = null;
+    renderSidebar();
+    renderProject();
+  } catch(e) {
+    alert('Import failed: ' + e.message);
+  }
+}
+
 async function exportProcedure(tagFilter) {
   const p = state.current;
   if (!p) return;
 
-  const engDesired  = p.cells['desired.engineer']?.queue || [];
-  const { executionOrder } = analyzeTopology(p);
+  const engDesired = p.cells['desired.engineer']?.queue || [];
+  const { executionOrder, enabledBy, itemEnables } = analyzeTopology(p);
 
   const filtered = tagFilter
     ? executionOrder.filter(e => !e.item || getTags(e.item).includes(tagFilter))
@@ -1418,62 +1453,135 @@ async function exportProcedure(tagFilter) {
 
   const projectName = p.name || 'KRM Project';
   const filterNote  = tagFilter ? ` — filtered by tag: ${tagFilter}` : '';
-  const date = new Date().toISOString().slice(0,10);
+  const date        = new Date().toISOString().slice(0, 10);
 
-  let md = `# ${projectName} — Procedure${filterNote}\n`;
-  md += `*Generated ${date} from KRM topological sort*\n\n`;
+  const STATUS_GLYPH = { closed: '✓', active: '▶', pending: '○', deferred: '—', blocked: '✗' };
+
+  const lastItemForState = {};
+  filtered.forEach(({ item, enables }) => {
+    if (!item) return;
+    enables.forEach(sid => { lastItemForState[sid] = item.id; });
+  });
+
+  const esOrder = [];
+  const seenEs = new Set();
+  filtered.forEach(({ item, enables }) => {
+    if (!item) return;
+    enables.forEach(sid => {
+      if (!seenEs.has(sid)) { seenEs.add(sid); esOrder.push(sid); }
+    });
+  });
+
+  const chapters = {};
+  const unanchored = [];
+  filtered.forEach(entry => {
+    const { item, enables } = entry;
+    if (!item) return;
+    if (enables.length) {
+      const chapterId = enables[0];
+      if (!chapters[chapterId]) chapters[chapterId] = [];
+      chapters[chapterId].push(entry);
+    } else {
+      unanchored.push(entry);
+    }
+  });
+
+  let md = `# ${projectName} — Runbook${filterNote}\n`;
+  md += `*Generated ${date} · KRM topological sort*\n\n`;
 
   if (p.cells['desired.stakeholder']?.story) {
-    md += `**Goal:** ${p.cells['desired.stakeholder'].story}\n\n`;
+    md += `**Objective:** ${p.cells['desired.stakeholder'].story}\n\n`;
+  }
+  if (p.cells['kinetic.stakeholder']?.story) {
+    md += `**Context:** ${p.cells['kinetic.stakeholder'].story}\n\n`;
   }
 
-  md += `---\n\n`;
+  md += `---\n\n## Contents\n\n`;
+  esOrder.forEach((sid, i) => {
+    const es = engDesired.find(d => d.id === sid);
+    if (!es) return;
+    const items = chapters[sid] || [];
+    const closed = items.filter(e => e.item.status === 'closed').length;
+    md += `${i + 1}. ${es.description} *(${closed}/${items.length} closed)*\n`;
+  });
+  if (unanchored.length) {
+    md += `${esOrder.length + 1}. Unanchored items *(${unanchored.length})*\n`;
+  }
+  md += `\n---\n\n`;
 
-  let stepNum = 1;
-  let lastEnabledStates = [];
+  let globalStep = 1;
+  esOrder.forEach((sid, chIdx) => {
+    const es = engDesired.find(d => d.id === sid);
+    if (!es) return;
+    const items = chapters[sid] || [];
+    if (!items.length) return;
 
-  filtered.forEach(({ item, enables, inCycle }) => {
-    if (!item) return;
+    const closed = items.filter(e => e.item.status === 'closed').length;
+    const total  = items.length;
+    const allClosed = closed === total;
+    const milestone = allClosed ? '🟢' : '🔵';
 
-    const tags = getTags(item);
-    const acM  = (item.notes||'').match(/ac:([^|]+)/);
-    const ac   = acM ? acM[1].trim().replace(/depends_on:\d+/g,'').replace(/declared:[\d,]+/g,'').trim() : null;
+    md += `## ${chIdx + 1}. ${es.description}\n\n`;
+    md += `${milestone} **Milestone:** ${closed}/${total} work items closed`;
+    if (allClosed) md += ` — state achieved`;
+    md += `\n\n`;
 
-    // State completion marker
-    const enablesNames = enables.map(sid => {
-      const s = engDesired.find(d => d.id === sid);
-      return s ? s.description : null;
-    }).filter(Boolean);
+    items.forEach(({ item, enables, inCycle }) => {
+      const glyph  = STATUS_GLYPH[item.status] || '○';
+      const tags   = getTags(item);
+      const acM    = (item.notes || '').match(/ac:([^|]+)/);
+      const ac     = acM ? acM[1].trim().replace(/depends_on:\d+/g, '').replace(/declared:[\d,]+/g, '').trim() : null;
+      const otherStates = enables.filter(s => s !== sid).map(s => {
+        const found = engDesired.find(d => d.id === s);
+        return found ? found.description : null;
+      }).filter(Boolean);
 
-    md += `### ${stepNum}. ${item.description || ''}\n`;
+      md += `### Step ${globalStep}. ${item.description || ''}\n\n`;
+      if (inCycle) md += `> ⛔ **Warning:** This item is part of a circular dependency.\n\n`;
+      md += `**Status:** ${glyph} ${item.status}`;
+      if (tags.length) md += `  |  **Tags:** ${tags.join(', ')}`;
+      md += `\n\n`;
+      if (ac) md += `**Verification:**\n> ${ac}\n\n`;
+      if (otherStates.length) md += `**Also enables:** ${otherStates.join('; ')}\n\n`;
+      globalStep++;
+    });
 
-    if (inCycle) md += `> ⛔ **Warning:** This item is part of a circular dependency and may not be executable.\n`;
-
-    if (ac) md += `**Verification:** ${ac}\n`;
-
-    if (enablesNames.length) {
-      md += `**Enables:** ${enablesNames.join('; ')}\n`;
-    }
-
-    if (tags.length) md += `**Tags:** ${tags.join(', ')}\n`;
-
-    md += `**Status:** ${item.status}\n\n`;
-    stepNum++;
+    md += `---\n\n`;
   });
 
-  // Engineered state summary
-  md += `---\n\n## Engineered State Completion\n\n`;
-  engDesired.forEach((state, idx) => {
-    const allItems = p.cells['kinetic.engineer']?.queue || [];
-    const required = allItems.filter(wi => getDeclaredDeps(wi).includes(state.id));
-    const closed   = required.filter(wi => wi.status === 'closed').length;
-    const pct = required.length ? Math.round((closed/required.length)*100) : 0;
-    md += `${idx+1}. **${state.description}** — ${closed}/${required.length} work items closed (${pct}%)\n`;
+  if (unanchored.length) {
+    md += `## ${esOrder.length + 1}. Unanchored Items\n\n`;
+    md += `⚠ These work items do not declare any engineered states they enable.\n\n`;
+    unanchored.forEach(({ item, inCycle }) => {
+      const glyph = STATUS_GLYPH[item.status] || '○';
+      const acM   = (item.notes || '').match(/ac:([^|]+)/);
+      const ac    = acM ? acM[1].trim() : null;
+      md += `### Step ${globalStep}. ${item.description || ''}\n\n`;
+      if (inCycle) md += `> ⛔ **Warning:** Circular dependency.\n\n`;
+      md += `**Status:** ${glyph} ${item.status}\n\n`;
+      if (ac) md += `**Verification:**\n> ${ac}\n\n`;
+      globalStep++;
+    });
+    md += `---\n\n`;
+  }
+
+  md += `## Engineered State Summary\n\n`;
+  md += `| # | State | Closed | Total | % |\n`;
+  md += `|---|---|---|---|---|\n`;
+  engDesired.forEach((es, idx) => {
+    const required = enabledBy[es.id] || [];
+    const allWork  = p.cells['kinetic.engineer']?.queue || [];
+    const inFilter = tagFilter
+      ? required.filter(id => { const wi = allWork.find(i => i.id === id); return wi && getTags(wi).includes(tagFilter); })
+      : required;
+    const closed = inFilter.filter(id => { const wi = allWork.find(i => i.id === id); return wi && wi.status === 'closed'; }).length;
+    const pct    = inFilter.length ? Math.round((closed / inFilter.length) * 100) : 0;
+    md += `| ${idx + 1} | ${es.description} | ${closed} | ${inFilter.length} | ${pct}% |\n`;
   });
 
-  const filename = `${projectName.toLowerCase().replace(/[^a-z0-9]+/g,'-')}-procedure${tagFilter?'-'+tagFilter:''}.md`;
+  const filename = `${projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-runbook${tagFilter ? '-' + tagFilter : ''}.md`;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([md], {type:'text/markdown'}));
+  a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }));
   a.download = filename;
   a.click();
 }
@@ -1528,7 +1636,6 @@ async function exportKineticView() {
 function getTags(item) {
   const m = (item.notes||'').match(/tags:([^|\n]+)/);
   if (!m) return [];
-  // Stop at next key:value token (e.g. covers:, upstream_for:, declared:)
   const raw = m[1].replace(/\s+\w+:[^\s]+/g, '').replace(/\w+:[^\s,]+/g, '');
   return raw.split(',').map(t => t.trim()).filter(Boolean);
 }
@@ -2571,7 +2678,6 @@ function renderKineticAnalysis(p) {
       </div>
     </div>`;
 
-  // Export banner at TOP of kinetic view for visibility
   const exportBannerHtml = `
     <div style="margin-bottom:20px;padding:12px 16px;background:rgba(91,141,238,.08);border:1px solid rgba(91,141,238,.2);border-radius:var(--r);display:flex;align-items:center;justify-content:space-between;gap:16px">
       <div>
