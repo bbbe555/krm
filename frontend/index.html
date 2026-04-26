@@ -928,11 +928,11 @@ function renderMatrixView(p) {
     </div>`;
   }
 
-  html += `<div style="position:relative" id="matrix-wrap">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+  html += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button class="btn-ghost btn-sm" id="dep-viz-toggle" onclick="toggleDepViz()" style="font-size:11px;font-family:var(--mono);letter-spacing:.06em">⬡ Show dependencies</button>
     </div>
-    <svg id="dep-viz-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:none;z-index:10" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    <div style="position:relative" id="matrix-wrap">
+    <svg id="dep-viz-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:none;z-index:20;overflow:visible" xmlns="http://www.w3.org/2000/svg"></svg>`;
   html += '<div class="matrix-grid" id="matrix-grid">';
   html += '<div class="matrix-header"></div>';
   STATES.forEach(s => {
@@ -3225,7 +3225,12 @@ function renderDepViz() {
   const eRect = cellRect('desired.engineer');
   if (!wRect || !eRect) return;
 
-  svg.setAttribute('viewBox', '0 0 ' + wrapRect.width + ' ' + wrapRect.height);
+  // Size SVG to cover from leftmost to rightmost cell with some padding
+  const svgWidth  = wrapRect.width;
+  const svgHeight = wrapRect.height;
+  svg.setAttribute('viewBox', '0 0 ' + svgWidth + ' ' + svgHeight);
+  svg.style.width  = svgWidth  + 'px';
+  svg.style.height = svgHeight + 'px';
 
   let content = '<defs>';
   [['green','#4ade80'],['yellow','#fbbf24'],['gray','#888'],['red','#f87171']].forEach(function(pair) {
