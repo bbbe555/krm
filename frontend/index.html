@@ -635,7 +635,7 @@
 </div>
 
 <script>
-const VERSION = '5.11';
+const VERSION = '5.11.1';
 const API = '';
 let state = { projects: [], current: null, step: 0, tab: null };
 let depFocus = null; // { type: 'eng'|'cond', id: Number }
@@ -931,8 +931,7 @@ function renderMatrixView(p) {
   html += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
       <button class="btn-ghost btn-sm" id="dep-viz-toggle" onclick="toggleDepViz()" style="font-size:11px;font-family:var(--mono);letter-spacing:.06em">⬡ Show dependencies</button>
     </div>
-    <div style="position:relative" id="matrix-wrap">
-    <svg id="dep-viz-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:none;z-index:20;overflow:visible" xmlns="http://www.w3.org/2000/svg"></svg>`;
+    <div id="matrix-wrap">`;
   html += '<div class="matrix-grid" id="matrix-grid">';
   html += '<div class="matrix-header"></div>';
   STATES.forEach(s => {
@@ -3157,19 +3156,21 @@ let depVizEnabled = false;
 
 function toggleDepViz() {
   depVizEnabled = !depVizEnabled;
-  const svg = document.getElementById('dep-viz-svg');
   const btn = document.getElementById('dep-viz-toggle');
-  if (!svg || !btn) return;
-  svg.style.display = depVizEnabled ? 'block' : 'none';
-  btn.textContent = depVizEnabled ? '⬡ Hide dependencies' : '⬡ Show dependencies';
-  btn.style.color = depVizEnabled ? 'var(--accent)' : '';
-  if (depVizEnabled) renderDepViz();
+  if (btn) {
+    btn.textContent = depVizEnabled ? '⬡ Hide dependencies' : '⬡ Show dependencies';
+    btn.style.color = depVizEnabled ? 'var(--accent)' : '';
+  }
+  if (!depVizEnabled) {
+    const svg = document.getElementById('dep-viz-svg');
+    if (svg) svg.style.display = 'none';
+  } else {
+    renderDepViz();
+  }
 }
 
 function renderDepViz() {
-  const svg = document.getElementById('dep-viz-svg');
-  const wrap = document.getElementById('matrix-wrap');
-  if (!svg || !wrap || !depVizEnabled) return;
+  if (!depVizEnabled) return;
 
   const p = state.current;
   if (!p) return;
@@ -3178,24 +3179,30 @@ function renderDepViz() {
   const workItems = p.cells['kinetic.engineer']?.queue || [];
   if (!engStates.length || !workItems.length) return;
 
+  // Get or create a fixed-position SVG overlay on the body
+  let svg = document.getElementById('dep-viz-svg');
+  if (!svg) {
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.id = 'dep-viz-svg';
+    svg.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;overflow:visible';
+    document.body.appendChild(svg);
+  }
+  svg.style.display = 'block';
+
   function getDeclaredIds(notes, key) {
     const m = (notes||'').match(new RegExp(key + ':([\\d,]+)'));
     return m ? m[1].split(',').map(Number).filter(Boolean) : [];
   }
 
-  const wrapRect = wrap.getBoundingClientRect();
-
+  // Use viewport-relative coordinates since SVG is fixed on body
   function cellRect(cellKey) {
-    const el = wrap.querySelector('[data-cell="' + cellKey + '"]');
+    const el = document.querySelector('[data-cell="' + cellKey + '"]');
     if (!el) return null;
     const r = el.getBoundingClientRect();
     return {
-      top:    r.top    - wrapRect.top,
-      bottom: r.bottom - wrapRect.top,
-      left:   r.left   - wrapRect.left,
-      right:  r.right  - wrapRect.left,
-      width:  r.width,
-      height: r.height
+      top: r.top, bottom: r.bottom,
+      left: r.left, right: r.right,
+      width: r.width, height: r.height
     };
   }
 
@@ -3226,11 +3233,8 @@ function renderDepViz() {
   if (!wRect || !eRect) return;
 
   // Size SVG to cover from leftmost to rightmost cell with some padding
-  const svgWidth  = wrapRect.width;
-  const svgHeight = wrapRect.height;
-  svg.setAttribute('viewBox', '0 0 ' + svgWidth + ' ' + svgHeight);
-  svg.style.width  = svgWidth  + 'px';
-  svg.style.height = svgHeight + 'px';
+  // Fixed position SVG covers full viewport — no viewBox needed, use raw coords
+  svg.setAttribute('viewBox', '0 0 ' + window.innerWidth + ' ' + window.innerHeight);
 
   let content = '<defs>';
   [['green','#4ade80'],['yellow','#fbbf24'],['gray','#888'],['red','#f87171']].forEach(function(pair) {
