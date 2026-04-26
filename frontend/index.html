@@ -635,7 +635,7 @@
 </div>
 
 <script>
-const VERSION = '5.11.2';
+const VERSION = '5.11.3';
 const API = '';
 let state = { projects: [], current: null, step: 0, tab: null };
 let depFocus = null; // { type: 'eng'|'cond', id: Number }
@@ -3232,11 +3232,6 @@ function renderDepViz() {
   const eRect = cellRect('desired.engineer');
   if (!wRect || !eRect) return;
 
-  console.log('DEP VIZ coords:', JSON.stringify({
-    wRect: {l:Math.round(wRect.left), r:Math.round(wRect.right), t:Math.round(wRect.top), b:Math.round(wRect.bottom), w:Math.round(wRect.width), h:Math.round(wRect.height)},
-    eRect: {l:Math.round(eRect.left), r:Math.round(eRect.right), t:Math.round(eRect.top), b:Math.round(eRect.bottom), w:Math.round(eRect.width), h:Math.round(eRect.height)},
-    vp: {w:window.innerWidth, h:window.innerHeight}
-  }));
 
   svg.setAttribute('viewBox', '0 0 ' + window.innerWidth + ' ' + window.innerHeight);
 
@@ -3247,24 +3242,37 @@ function renderDepViz() {
   });
   content += '</defs>';
 
+  // Cells are adjacent — draw arcs that bow ABOVE the engineer row
+  // srcX/dstX are the center-x of each work item / eng state (spread across cell width)
+  // Arc bows upward by bowHeight pixels above the top of the cells
+
+  const bowHeight = Math.min(wRect.height * 1.2, 180); // how far above the row to arc
+  const arcTop = wRect.top - bowHeight;
+
   threads.forEach(function(t) {
     const wi = t.wi, esId = t.esId;
     const wiIdx = workItems.findIndex(function(w) { return w.id === wi.id; });
     const esIdx = engStates.findIndex(function(e) { return e.id === esId; });
 
-    const srcX = wRect.right - 2;
-    const srcY = wRect.top + (wRect.height * (wiIdx + 1)) / (workItems.length + 1);
-    const dstX = eRect.left + 2;
-    const dstY = eRect.top  + (eRect.height * (esIdx + 1)) / (engStates.length + 1);
+    // Spread connection points across cell width so threads fan out visibly
+    const srcX = wRect.left + (wRect.width  * (wiIdx + 1)) / (workItems.length + 1);
+    const dstX = eRect.left + (eRect.width  * (esIdx + 1)) / (engStates.length + 1);
+    const srcY = wRect.top + 4;   // top edge of kinetic.engineer cell
+    const dstY = eRect.top + 4;   // top edge of desired.engineer cell
+
+    // Control points bow upward
+    const cx1 = srcX;
+    const cy1 = arcTop;
+    const cx2 = dstX;
+    const cy2 = arcTop;
 
     const convergence = esConvergence[esId] || 1;
-    const strokeW = Math.min(1 + (convergence - 1) * 0.5, 4);
+    const strokeW = Math.min(1 + (convergence - 1) * 0.5, 3.5);
     const color = STATUS_COLOR[wi.status] || '#888';
-    const opacity = wi.status === 'closed' ? 0.45 : wi.status === 'pending' ? 0.2 : 0.6;
+    const opacity = wi.status === 'closed' ? 0.5 : wi.status === 'pending' ? 0.2 : 0.65;
     const arrowId = wi.status === 'closed' ? 'green' : wi.status === 'active' ? 'yellow' : wi.status === 'blocked' ? 'red' : 'gray';
 
-    const mx = srcX + (dstX - srcX) * 0.5;
-    content += '<path d="M' + srcX + ',' + srcY + ' C' + mx + ',' + srcY + ' ' + mx + ',' + dstY + ' ' + dstX + ',' + dstY + '"' +
+    content += '<path d="M' + srcX + ',' + srcY + ' C' + cx1 + ',' + cy1 + ' ' + cx2 + ',' + cy2 + ' ' + dstX + ',' + dstY + '"' +
       ' stroke="' + color + '" stroke-width="' + strokeW + '" fill="none"' +
       ' opacity="' + opacity + '" marker-end="url(#arr-' + arrowId + ')"/>';
   });
