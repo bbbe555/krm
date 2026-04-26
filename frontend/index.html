@@ -635,7 +635,7 @@
 </div>
 
 <script>
-const VERSION = '5.11.1';
+const VERSION = '5.11.2';
 const API = '';
 let state = { projects: [], current: null, step: 0, tab: null };
 let depFocus = null; // { type: 'eng'|'cond', id: Number }
@@ -3232,8 +3232,12 @@ function renderDepViz() {
   const eRect = cellRect('desired.engineer');
   if (!wRect || !eRect) return;
 
-  // Size SVG to cover from leftmost to rightmost cell with some padding
-  // Fixed position SVG covers full viewport — no viewBox needed, use raw coords
+  console.log('DEP VIZ coords:', JSON.stringify({
+    wRect: {l:Math.round(wRect.left), r:Math.round(wRect.right), t:Math.round(wRect.top), b:Math.round(wRect.bottom), w:Math.round(wRect.width), h:Math.round(wRect.height)},
+    eRect: {l:Math.round(eRect.left), r:Math.round(eRect.right), t:Math.round(eRect.top), b:Math.round(eRect.bottom), w:Math.round(eRect.width), h:Math.round(eRect.height)},
+    vp: {w:window.innerWidth, h:window.innerHeight}
+  }));
+
   svg.setAttribute('viewBox', '0 0 ' + window.innerWidth + ' ' + window.innerHeight);
 
   let content = '<defs>';
