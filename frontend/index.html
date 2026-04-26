@@ -602,8 +602,6 @@
       <div class="sidebar-header">
         <span class="sidebar-title">Projects</span>
         <button class="btn-ghost btn-sm" onclick="openNewProject()">+ New</button>
-        <button class="btn-ghost btn-sm" onclick="document.getElementById('import-file-input').click()">↑ Import</button>
-        <input type="file" id="import-file-input" accept=".json" style="display:none" onchange="importJSON(this)">
       </div>
       <div id="project-list"></div>
     </div>
@@ -615,7 +613,6 @@
         <h2>No project selected</h2>
         <p>Create a new project to begin working through the Kinetic Requirements Model procedure.</p>
         <button class="btn-primary" onclick="openNewProject()">Create project</button>
-        <button class="btn-ghost" onclick="document.getElementById('import-file-input').click()">Import JSON</button>
       </div>
       <div id="view-project" class="hidden"></div>
     </div>
@@ -638,7 +635,7 @@
 </div>
 
 <script>
-const VERSION = '5.10';
+const VERSION = '5.11';
 const API = '';
 let state = { projects: [], current: null, step: 0, tab: null };
 let depFocus = null; // { type: 'eng'|'cond', id: Number }
@@ -764,6 +761,7 @@ function renderTab() {
 
   if (state.tab === 'view') {
     el.innerHTML = renderMatrixView(state.current);
+    setTimeout(renderDepViz, 50);
   } else {
     // Step nav
     const navHtml = STEPS.map((s,i) => `
@@ -930,7 +928,12 @@ function renderMatrixView(p) {
     </div>`;
   }
 
-  html += '<div class="matrix-grid">';
+  html += `<div style="position:relative" id="matrix-wrap">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button class="btn-ghost btn-sm" id="dep-viz-toggle" onclick="toggleDepViz()" style="font-size:11px;font-family:var(--mono);letter-spacing:.06em">⬡ Show dependencies</button>
+    </div>
+    <svg id="dep-viz-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:none;z-index:10" xmlns="http://www.w3.org/2000/svg"></svg>`;
+  html += '<div class="matrix-grid" id="matrix-grid">';
   html += '<div class="matrix-header"></div>';
   STATES.forEach(s => {
     html += `<div class="matrix-header">${STATE_LABELS[s]}</div>`;
@@ -946,7 +949,7 @@ function renderMatrixView(p) {
       const isEmpty = cellIsEmpty(p, st, role);
       const isQueueCell = st === 'kinetic' && role === 'engineer';
 
-      html += `<div class="matrix-cell" style="cursor:pointer;position:relative"
+      html += `<div class="matrix-cell" data-cell="${st}.${role}" style="cursor:pointer;position:relative"
         onclick="matrixCellClick('${st}','${role}')"
         onmouseenter="this.style.background='var(--surface2)'"
         onmouseleave="this.style.background='var(--surface)'">`;
@@ -1000,6 +1003,7 @@ function renderMatrixView(p) {
   });
 
   html += '</div>';
+  html += '</div>'; // close matrix-wrap
 
   // Progress bar
   const queue = p.cells['kinetic.engineer']?.queue || [];
@@ -1408,44 +1412,12 @@ function renderTestPlanStep(p, s) {
 }
 
 
-async function importJSON(input) {
-  const file = input.files[0];
-  if (!file) return;
-  input.value = '';
-  let data;
-  try {
-    data = JSON.parse(await file.text());
-  } catch(e) {
-    alert('Invalid JSON file.');
-    return;
-  }
-  if (!data.name || !data.cells) {
-    alert('This does not look like a KRM export file.');
-    return;
-  }
-  try {
-    const project = await api('POST', '/api/projects/import', {
-      name: data.name,
-      description: data.description || null,
-      cells: data.cells
-    });
-    state.projects = await api('GET', '/api/projects');
-    state.current = project;
-    state.step = 0;
-    state.tab = null;
-    renderSidebar();
-    renderProject();
-  } catch(e) {
-    alert('Import failed: ' + e.message);
-  }
-}
-
 async function exportProcedure(tagFilter) {
   const p = state.current;
   if (!p) return;
 
-  const engDesired = p.cells['desired.engineer']?.queue || [];
-  const { executionOrder, enabledBy, itemEnables } = analyzeTopology(p);
+  const engDesired  = p.cells['desired.engineer']?.queue || [];
+  const { executionOrder } = analyzeTopology(p);
 
   const filtered = tagFilter
     ? executionOrder.filter(e => !e.item || getTags(e.item).includes(tagFilter))
@@ -1453,135 +1425,62 @@ async function exportProcedure(tagFilter) {
 
   const projectName = p.name || 'KRM Project';
   const filterNote  = tagFilter ? ` — filtered by tag: ${tagFilter}` : '';
-  const date        = new Date().toISOString().slice(0, 10);
+  const date = new Date().toISOString().slice(0,10);
 
-  const STATUS_GLYPH = { closed: '✓', active: '▶', pending: '○', deferred: '—', blocked: '✗' };
-
-  const lastItemForState = {};
-  filtered.forEach(({ item, enables }) => {
-    if (!item) return;
-    enables.forEach(sid => { lastItemForState[sid] = item.id; });
-  });
-
-  const esOrder = [];
-  const seenEs = new Set();
-  filtered.forEach(({ item, enables }) => {
-    if (!item) return;
-    enables.forEach(sid => {
-      if (!seenEs.has(sid)) { seenEs.add(sid); esOrder.push(sid); }
-    });
-  });
-
-  const chapters = {};
-  const unanchored = [];
-  filtered.forEach(entry => {
-    const { item, enables } = entry;
-    if (!item) return;
-    if (enables.length) {
-      const chapterId = enables[0];
-      if (!chapters[chapterId]) chapters[chapterId] = [];
-      chapters[chapterId].push(entry);
-    } else {
-      unanchored.push(entry);
-    }
-  });
-
-  let md = `# ${projectName} — Runbook${filterNote}\n`;
-  md += `*Generated ${date} · KRM topological sort*\n\n`;
+  let md = `# ${projectName} — Procedure${filterNote}\n`;
+  md += `*Generated ${date} from KRM topological sort*\n\n`;
 
   if (p.cells['desired.stakeholder']?.story) {
-    md += `**Objective:** ${p.cells['desired.stakeholder'].story}\n\n`;
-  }
-  if (p.cells['kinetic.stakeholder']?.story) {
-    md += `**Context:** ${p.cells['kinetic.stakeholder'].story}\n\n`;
+    md += `**Goal:** ${p.cells['desired.stakeholder'].story}\n\n`;
   }
 
-  md += `---\n\n## Contents\n\n`;
-  esOrder.forEach((sid, i) => {
-    const es = engDesired.find(d => d.id === sid);
-    if (!es) return;
-    const items = chapters[sid] || [];
-    const closed = items.filter(e => e.item.status === 'closed').length;
-    md += `${i + 1}. ${es.description} *(${closed}/${items.length} closed)*\n`;
-  });
-  if (unanchored.length) {
-    md += `${esOrder.length + 1}. Unanchored items *(${unanchored.length})*\n`;
-  }
-  md += `\n---\n\n`;
+  md += `---\n\n`;
 
-  let globalStep = 1;
-  esOrder.forEach((sid, chIdx) => {
-    const es = engDesired.find(d => d.id === sid);
-    if (!es) return;
-    const items = chapters[sid] || [];
-    if (!items.length) return;
+  let stepNum = 1;
+  let lastEnabledStates = [];
 
-    const closed = items.filter(e => e.item.status === 'closed').length;
-    const total  = items.length;
-    const allClosed = closed === total;
-    const milestone = allClosed ? '🟢' : '🔵';
+  filtered.forEach(({ item, enables, inCycle }) => {
+    if (!item) return;
 
-    md += `## ${chIdx + 1}. ${es.description}\n\n`;
-    md += `${milestone} **Milestone:** ${closed}/${total} work items closed`;
-    if (allClosed) md += ` — state achieved`;
-    md += `\n\n`;
+    const tags = getTags(item);
+    const acM  = (item.notes||'').match(/ac:([^|]+)/);
+    const ac   = acM ? acM[1].trim().replace(/depends_on:\d+/g,'').replace(/declared:[\d,]+/g,'').trim() : null;
 
-    items.forEach(({ item, enables, inCycle }) => {
-      const glyph  = STATUS_GLYPH[item.status] || '○';
-      const tags   = getTags(item);
-      const acM    = (item.notes || '').match(/ac:([^|]+)/);
-      const ac     = acM ? acM[1].trim().replace(/depends_on:\d+/g, '').replace(/declared:[\d,]+/g, '').trim() : null;
-      const otherStates = enables.filter(s => s !== sid).map(s => {
-        const found = engDesired.find(d => d.id === s);
-        return found ? found.description : null;
-      }).filter(Boolean);
+    // State completion marker
+    const enablesNames = enables.map(sid => {
+      const s = engDesired.find(d => d.id === sid);
+      return s ? s.description : null;
+    }).filter(Boolean);
 
-      md += `### Step ${globalStep}. ${item.description || ''}\n\n`;
-      if (inCycle) md += `> ⛔ **Warning:** This item is part of a circular dependency.\n\n`;
-      md += `**Status:** ${glyph} ${item.status}`;
-      if (tags.length) md += `  |  **Tags:** ${tags.join(', ')}`;
-      md += `\n\n`;
-      if (ac) md += `**Verification:**\n> ${ac}\n\n`;
-      if (otherStates.length) md += `**Also enables:** ${otherStates.join('; ')}\n\n`;
-      globalStep++;
-    });
+    md += `### ${stepNum}. ${item.description || ''}\n`;
 
-    md += `---\n\n`;
+    if (inCycle) md += `> ⛔ **Warning:** This item is part of a circular dependency and may not be executable.\n`;
+
+    if (ac) md += `**Verification:** ${ac}\n`;
+
+    if (enablesNames.length) {
+      md += `**Enables:** ${enablesNames.join('; ')}\n`;
+    }
+
+    if (tags.length) md += `**Tags:** ${tags.join(', ')}\n`;
+
+    md += `**Status:** ${item.status}\n\n`;
+    stepNum++;
   });
 
-  if (unanchored.length) {
-    md += `## ${esOrder.length + 1}. Unanchored Items\n\n`;
-    md += `⚠ These work items do not declare any engineered states they enable.\n\n`;
-    unanchored.forEach(({ item, inCycle }) => {
-      const glyph = STATUS_GLYPH[item.status] || '○';
-      const acM   = (item.notes || '').match(/ac:([^|]+)/);
-      const ac    = acM ? acM[1].trim() : null;
-      md += `### Step ${globalStep}. ${item.description || ''}\n\n`;
-      if (inCycle) md += `> ⛔ **Warning:** Circular dependency.\n\n`;
-      md += `**Status:** ${glyph} ${item.status}\n\n`;
-      if (ac) md += `**Verification:**\n> ${ac}\n\n`;
-      globalStep++;
-    });
-    md += `---\n\n`;
-  }
-
-  md += `## Engineered State Summary\n\n`;
-  md += `| # | State | Closed | Total | % |\n`;
-  md += `|---|---|---|---|---|\n`;
-  engDesired.forEach((es, idx) => {
-    const required = enabledBy[es.id] || [];
-    const allWork  = p.cells['kinetic.engineer']?.queue || [];
-    const inFilter = tagFilter
-      ? required.filter(id => { const wi = allWork.find(i => i.id === id); return wi && getTags(wi).includes(tagFilter); })
-      : required;
-    const closed = inFilter.filter(id => { const wi = allWork.find(i => i.id === id); return wi && wi.status === 'closed'; }).length;
-    const pct    = inFilter.length ? Math.round((closed / inFilter.length) * 100) : 0;
-    md += `| ${idx + 1} | ${es.description} | ${closed} | ${inFilter.length} | ${pct}% |\n`;
+  // Engineered state summary
+  md += `---\n\n## Engineered State Completion\n\n`;
+  engDesired.forEach((state, idx) => {
+    const allItems = p.cells['kinetic.engineer']?.queue || [];
+    const required = allItems.filter(wi => getDeclaredDeps(wi).includes(state.id));
+    const closed   = required.filter(wi => wi.status === 'closed').length;
+    const pct = required.length ? Math.round((closed/required.length)*100) : 0;
+    md += `${idx+1}. **${state.description}** — ${closed}/${required.length} work items closed (${pct}%)\n`;
   });
 
-  const filename = `${projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-runbook${tagFilter ? '-' + tagFilter : ''}.md`;
+  const filename = `${projectName.toLowerCase().replace(/[^a-z0-9]+/g,'-')}-procedure${tagFilter?'-'+tagFilter:''}.md`;
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }));
+  a.href = URL.createObjectURL(new Blob([md], {type:'text/markdown'}));
   a.download = filename;
   a.click();
 }
@@ -1636,8 +1535,7 @@ async function exportKineticView() {
 function getTags(item) {
   const m = (item.notes||'').match(/tags:([^|\n]+)/);
   if (!m) return [];
-  const raw = m[1].replace(/\s+\w+:[^\s]+/g, '').replace(/\w+:[^\s,]+/g, '');
-  return raw.split(',').map(t => t.trim()).filter(Boolean);
+  return m[1].split(',').map(t => t.trim()).filter(Boolean);
 }
 
 function getAllTags(p) {
@@ -2670,27 +2568,12 @@ function renderKineticAnalysis(p) {
     </div>`;
 
   const exportHtml = `
-    <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
-      <div style="font-size:11px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Export Runbook</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button class="btn-primary btn-sm" onclick="exportProcedure(null)">↓ All items</button>
-        ${allTags.map(t => `<button class="btn-ghost btn-sm" onclick="exportProcedure('${esc(t)}')">↓ ${esc(t)}</button>`).join('')}
-      </div>
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Export procedure:</span>
+      <button class="btn-ghost btn-sm" onclick="exportProcedure(null)">All items</button>
+      ${allTags.map(t => `<button class="btn-ghost btn-sm" onclick="exportProcedure('${esc(t)}')">${esc(t)}</button>`).join('')}
     </div>`;
-
-  const exportBannerHtml = `
-    <div style="margin-bottom:20px;padding:12px 16px;background:rgba(91,141,238,.08);border:1px solid rgba(91,141,238,.2);border-radius:var(--r);display:flex;align-items:center;justify-content:space-between;gap:16px">
-      <div>
-        <div style="font-size:13px;font-weight:500;color:var(--text)">Runbook Export</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">Generates a numbered runbook with milestone chapters and verification steps.</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-shrink:0">
-        <button class="btn-primary btn-sm" onclick="exportProcedure(null)">↓ Export runbook</button>
-        ${allTags.map(t => `<button class="btn-ghost btn-sm" onclick="exportProcedure('${esc(t)}')">↓ ${esc(t)}</button>`).join('')}
-      </div>
-    </div>`;
-
-  return exportBannerHtml + tagFilterHtml + contrHtml + orderHtml + stateHtml + exportHtml;
+  return tagFilterHtml + contrHtml + orderHtml + stateHtml + exportHtml;
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────
@@ -3267,6 +3150,115 @@ function slug(s) {
 
 document.getElementById('ver').textContent = VERSION;
 init();
+
+// ── Dependency Visualization ───────────────────────────────────────────────
+
+let depVizEnabled = false;
+
+function toggleDepViz() {
+  depVizEnabled = !depVizEnabled;
+  const svg = document.getElementById('dep-viz-svg');
+  const btn = document.getElementById('dep-viz-toggle');
+  if (!svg || !btn) return;
+  svg.style.display = depVizEnabled ? 'block' : 'none';
+  btn.textContent = depVizEnabled ? '⬡ Hide dependencies' : '⬡ Show dependencies';
+  btn.style.color = depVizEnabled ? 'var(--accent)' : '';
+  if (depVizEnabled) renderDepViz();
+}
+
+function renderDepViz() {
+  const svg = document.getElementById('dep-viz-svg');
+  const wrap = document.getElementById('matrix-wrap');
+  if (!svg || !wrap || !depVizEnabled) return;
+
+  const p = state.current;
+  if (!p) return;
+
+  const engStates = p.cells['desired.engineer']?.queue || [];
+  const workItems = p.cells['kinetic.engineer']?.queue || [];
+  if (!engStates.length || !workItems.length) return;
+
+  function getDeclaredIds(notes, key) {
+    const m = (notes||'').match(new RegExp(key + ':([\\d,]+)'));
+    return m ? m[1].split(',').map(Number).filter(Boolean) : [];
+  }
+
+  const wrapRect = wrap.getBoundingClientRect();
+
+  function cellRect(cellKey) {
+    const el = wrap.querySelector('[data-cell="' + cellKey + '"]');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      top:    r.top    - wrapRect.top,
+      bottom: r.bottom - wrapRect.top,
+      left:   r.left   - wrapRect.left,
+      right:  r.right  - wrapRect.left,
+      width:  r.width,
+      height: r.height
+    };
+  }
+
+  const STATUS_COLOR = {
+    closed: '#4ade80', active: '#fbbf24',
+    pending: '#888', deferred: '#555', blocked: '#f87171'
+  };
+
+  const threads = [];
+  const esConvergence = {};
+
+  workItems.forEach(wi => {
+    const targets = [...new Set([
+      ...getDeclaredIds(wi.notes, 'declared'),
+      ...getDeclaredIds(wi.notes, 'covers')
+    ])];
+    targets.forEach(esId => {
+      if (!engStates.find(e => e.id === esId)) return;
+      esConvergence[esId] = (esConvergence[esId] || 0) + 1;
+      threads.push({ wi, esId });
+    });
+  });
+
+  if (!threads.length) return;
+
+  const wRect = cellRect('kinetic.engineer');
+  const eRect = cellRect('desired.engineer');
+  if (!wRect || !eRect) return;
+
+  svg.setAttribute('viewBox', '0 0 ' + wrapRect.width + ' ' + wrapRect.height);
+
+  let content = '<defs>';
+  [['green','#4ade80'],['yellow','#fbbf24'],['gray','#888'],['red','#f87171']].forEach(function(pair) {
+    content += '<marker id="arr-' + pair[0] + '" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
+      '<path d="M0,0 L0,6 L6,3 z" fill="' + pair[1] + '" opacity="0.7"/></marker>';
+  });
+  content += '</defs>';
+
+  threads.forEach(function(t) {
+    const wi = t.wi, esId = t.esId;
+    const wiIdx = workItems.findIndex(function(w) { return w.id === wi.id; });
+    const esIdx = engStates.findIndex(function(e) { return e.id === esId; });
+
+    const srcX = wRect.right - 2;
+    const srcY = wRect.top + (wRect.height * (wiIdx + 1)) / (workItems.length + 1);
+    const dstX = eRect.left + 2;
+    const dstY = eRect.top  + (eRect.height * (esIdx + 1)) / (engStates.length + 1);
+
+    const convergence = esConvergence[esId] || 1;
+    const strokeW = Math.min(1 + (convergence - 1) * 0.5, 4);
+    const color = STATUS_COLOR[wi.status] || '#888';
+    const opacity = wi.status === 'closed' ? 0.45 : wi.status === 'pending' ? 0.2 : 0.6;
+    const arrowId = wi.status === 'closed' ? 'green' : wi.status === 'active' ? 'yellow' : wi.status === 'blocked' ? 'red' : 'gray';
+
+    const mx = srcX + (dstX - srcX) * 0.5;
+    content += '<path d="M' + srcX + ',' + srcY + ' C' + mx + ',' + srcY + ' ' + mx + ',' + dstY + ' ' + dstX + ',' + dstY + '"' +
+      ' stroke="' + color + '" stroke-width="' + strokeW + '" fill="none"' +
+      ' opacity="' + opacity + '" marker-end="url(#arr-' + arrowId + ')"/>';
+  });
+
+  svg.innerHTML = content;
+}
+
 </script>
 </body>
 </html>
